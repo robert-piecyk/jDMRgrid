@@ -141,13 +141,9 @@ modifiedExportMethylome <- function(model, out.dir, context, name) {
 #--------------------------------------------------------------------------
 
 makeRegionsImpute <- function(df, context, refRegion, mincov, nCytosines) {
-
-  #regions file
-  #tmp_reg <- dget(refRegion)
   tmp_reg <- refRegion
   data <- as.data.frame(tmp_reg$reg.obs)
   data <- data %>% dplyr::filter(data$chr != "M" & data$chr != "C")
-  #colnames(data)[which(names(data) == "cluster.size")] <- "cluster.length"
 
   #reference methimpute file
   ref_data <- data.table::fread(df, skip = 1, select = c("V1","V2","V3","V4","V5","V6"))
@@ -176,12 +172,6 @@ makeRegionsImpute <- function(df, context, refRegion, mincov, nCytosines) {
 
   data_gr$cytosineCount <- GenomicRanges::countOverlaps(data_gr, ref_gr)
 
-  #filtering by number of cytosines
-  if (nCytosines>0){
-    cat(paste0("Minimum number of cytosines per region: ", nCytosines,"\n"), sep = "")
-    data_gr <- data_gr[which(data_gr$cytosineCount >= nCytosines),]
-  }
-
   counts <- array(NA, dim=c(length(data_gr), 2), dimnames=list(NULL, c("methylated", "total")))
 
   overlaps <- IRanges::findOverlaps(ref_gr, data_gr)
@@ -200,13 +190,6 @@ makeRegionsImpute <- function(df, context, refRegion, mincov, nCytosines) {
 
       total <- dplyr::bind_rows(data.frame(Group.1=missingr,x=0), total)
       total <- total[order(total$Group.1),]
-
-      # for(item in seq_len(NROW((missingr)))){
-      #   methylated <- rbind(c(missingr[item],0), methylated)
-      #   methylated <- methylated[order(methylated$Group.1),]
-      #   total <- rbind(c(missingr[item],0), total)
-      #   total <- total[order(total$Group.1),]
-      # }
     }
     counts[,"methylated"] <- methylated$x
     counts[,"total"] <- total$x
@@ -218,15 +201,17 @@ makeRegionsImpute <- function(df, context, refRegion, mincov, nCytosines) {
 
 #--------------------------------------------------------------------------
 makeMethimpute <- function(df, context, fit.plot, fit.name, refRegion,
-                         include.intermediate, probability, out.dir, name, mincov, nCytosines){
-  methylome.data <- makeRegionsImpute(df, context, refRegion, mincov, nCytosines)
+                         include.intermediate, probability, out.dir, name, mincov){
+  methylome.data <- makeRegionsImpute(df, context, refRegion, mincov)
   if (!is.null(methylome.data$counts)) {
-    quant.cutoff <- as.numeric(quantile(methylome.data$counts[,"total"], probs = c(0.96), na.rm=TRUE))
+    quant.cutoff <- as.numeric(quantile(methylome.data$counts[,"total"],
+                                        probs = c(0.96),
+                                        na.rm=TRUE))
     distcor <- distanceCorrelation(methylome.data, distances=0:100)
     fit <- modified.estimateTransDist(distcor)
 
     if (fit.plot==TRUE){
-      print(paste0("Generating fit plot...", name))
+      message("Generating fit plot for ", name)
       pdf(paste0(out.dir, "/", fit.name, "-fit.pdf", sep = ""))
       print(fit)
       dev.off()
@@ -240,7 +225,10 @@ makeMethimpute <- function(df, context, fit.plot, fit.name, refRegion,
                              include.intermediate = include.intermediate,
                              update = probability)
 
-    methFile <- modifiedExportMethylome(model=model$data, out.dir=out.dir, context=context, name=name)
+    methFile <- modifiedExportMethylome(model = model$data,
+                                        out.dir = out.dir,
+                                        context = context,
+                                        name = name)
     rm(model)
   }
   rm(methylome.data)
