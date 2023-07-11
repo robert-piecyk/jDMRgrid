@@ -1,7 +1,14 @@
 #-----------------------------------------------------------------------------------------
-export.bins <- function(mylist, myinfo, out.dir, runName){
-  out.name <- paste0(out.dir, "/",runName,"_Win", myinfo$bin.size,"_Step", myinfo$step.size,"_",myinfo$context,".Rdata",sep="")
-  dput(mylist, out.name)
+export.bins <- function(mylist, myinfo, out.dir, runName)
+{
+  lapply(seq_along(myinfo$bin.size), function(z1) {
+    window.size.1 <- myinfo$bin.size[z1]
+    step.size.1 <- myinfo$step.size[z1]
+    mylist.1 <- mylist[[as.character(window.size.1)]]
+    context.1 <- myinfo$context[z1]
+    out.name.1 <- paste0(out.dir, "/",runName,"_Win", window.size.1,"_Step", step.size.1,"_",context.1,".Rdata",sep="")
+    dput(mylist.1, out.name.1)
+  })
 }
 #-----------------------------------------------------------------------------------------
 processWindow <- function(window.size, step.size) {
@@ -25,7 +32,8 @@ processWindow <- function(window.size, step.size) {
     ref_gr <- cyt_gr[which(cyt_gr$context == cx),]
     # Counting cytosines in GRanges
     dat.collect <- GenomicRanges::countOverlaps(data_gr, ref_gr)
-    new.dat.collect <- dat.collect[(which(dat.collect >= min.C))]
+    # Create a empirical distribution of cytosines within bins and find a threshold based on its min.C percentile
+    new.dat.collect <- dat.collect[(which(dat.collect >= as.numeric(quantile(ecdf(dat.collect), min.C/100))))]
     non.empty.bins <- length(new.dat.collect) / length(dat.collect)
     return(non.empty.bins)
   })
@@ -74,9 +82,11 @@ binGenome <- function(methimputefiles,
     out <- rbindlist(lapply(results, function(x) x$mydf))
     out <- out[order(out$bin.size, out$step.size),]
     out <- split(out, f = out$context)
-    mybins <- lapply(out, function(x) x[which.min(x$ratio),])
+    mybins <- out
+    #mybins <- lapply(out, function(x) x[which.min(x$ratio),]) #deleted selection of the min ratio per context
+    collect.bins <- lapply(results, function(x) x$collect.bins)
     message("Exporting regions...")
-    lapply(mybins, function(x) export.bins(mylist=collect.bins[[as.character(x$bin.size)]],
+    lapply(mybins, function(x) export.bins(mylist=collect.bins,
                                            myinfo=x,
                                            out.dir=out.dir,
                                            runName=runName))
@@ -88,26 +98,25 @@ binGenome <- function(methimputefiles,
 #' Run jDMR on binned genome
 #'
 #' this function runs a HMM model on a genome binned using a sliding/non-sliding window approach
-#' @param out.dir Output directory.
-#' @param window Output directory.
-#' @param samplefiles A text file containing path to samples and sample names. For control/treatment data an additional column specifying the replicates is required.
-#' @param min.C Minimum number of cytosines in at least 90 percent of the bins/regions.
-#' @param genome Genome name as a string .e.g Arabidopsis or Human etc.
-#' @param contexts cytosine contexts as a vector. By default this option is set for all 3 cytosine contexts CG, CHG and CHH.
-#' @param mincov Minimum read coverage over cytosines. Default is set as 0.
-#' @param include.intermediate A logical specifying whether or not the intermediate component should be included in the HMM model. By default it is set as FALSE.
-#' @param selectProperBinSize Logical specifying wheter we should select the proper bin size for each context among all possibilities in win. By default it is set as FALSE.
-#' @param nCytosines Minimum number of cytosines. Default is set as 0.
+#' @param out.dir Output directory. (character)
+#' @param window Bin size. (numeric vector)
+#' @param step Step size. (numeric vector)
+#' @param samplefiles Path to the text file containing path to samples and sample names. For control/treatment data an additional column specifying the replicates is required. (character)
+#' @param contexts Vector of cytosine contexts selected for DMR calling. By default this option is set for all 3 cytosine contexts CG, CHG and CHH. (character vector)
+#' @param min.C Percentile threshold based on empirical distribution of the cytosines across bins. (numeric value between 0 and 100)
+#' @param mincov Minimum read coverage over cytosines. By default this option is set as 0. (numeric value between 0 and 1)
+#' @param include.intermediate A logical specifying whether or not the intermediate component should be included in the HMM model. By default this option is set as FALSE. (logical)
+#' @param runName Name of the operation. By default this option is set to 'GridGenome'. (character)
 #' @importFrom data.table fread
 #' @importFrom stringr str_remove_all
 #' @export
 #'
 runjDMRgrid <- function(out.dir,
-                        window=200,
-                        step=50,
+                        window,
+                        step,
                         samplefiles,
                         contexts=c('CG','CHG','CHH'),
-                        min.C=0,
+                        min.C,
                         mincov=0,
                         include.intermediate=FALSE,
                         runName='GridGenome')
