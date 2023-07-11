@@ -9,7 +9,6 @@
 #' @export
 #'
 
-
 filterReplicateConsensus <- function(status.collect, rc.methlevel.collect, replicate.consensus, diff.ct=0.5){
 
   if (!is.null(status.collect$epiMAF)){
@@ -27,20 +26,31 @@ filterReplicateConsensus <- function(status.collect, rc.methlevel.collect, repli
     q <- lapply(1:NROW(status.collect), function(x){
       mypattern <- unlist(status.collect[x, 4:NCOL(status.collect)])
       df.bind <- cbind(sampleinfo, mypattern)
-      apply(df.bind, 1, function(row) {
-        m <- row[["sample"]]
-        total.reps <- length(df.bind$mypattern[df.bind$sample == m])
+      for (m in unique(df.bind$sample)){
+        total.reps <- length(df.bind$mypattern[df.bind$sample==m])
         rval <- round(replicate.consensus * total.reps)
-        pattern.vals <- df.bind$mypattern[df.bind$sample == m]
-        row[["diff.count"]] <- length(which(pattern.vals == 1)) / total.reps
+        pattern.vals <- df.bind$mypattern[df.bind$sample==m]
+        df.bind$diff.count[df.bind$sample==m] <- length(which(pattern.vals==1))/total.reps
         tt <- table(pattern.vals)
-        if (max(tt) >= rval) {
-          row[["count"]] <- 0
+        if (max(tt) >= rval){
+          df.bind$count[df.bind$sample==m] <- 0
         } else {
-          row[["count"]] <- 1
+          df.bind$rows <- apply(df.bind, 1, function(row) {
+            m <- row[["sample"]]
+            total.reps <- length(df.bind$mypattern[df.bind$sample == m])
+            rval <- round(replicate.consensus * total.reps)
+            pattern.vals <- df.bind$mypattern[df.bind$sample == m]
+            row[["diff.count"]] <- length(which(pattern.vals == 1)) / total.reps
+            tt <- table(pattern.vals)
+            if (max(tt) >= rval) {
+              row[["count"]] <- 0
+            } else {
+              row[["count"]] <- 1
+            }
+            return(row)
+          })[df.bind$sample==m] <- 1
         }
-        return(row)
-      })
+      }
       Sys.sleep(1/NROW(status.collect))
       setTxtProgressBar(pb1, x)
       close(pb1)
@@ -74,6 +84,7 @@ filterReplicateConsensus <- function(status.collect, rc.methlevel.collect, repli
   }
 }
 
+
 #------------------------------------------------------------------------------------------------
 
 #' @param mat1
@@ -85,17 +96,16 @@ filterReplicateConsensus <- function(status.collect, rc.methlevel.collect, repli
 #'
 
 filterEpiMAF <- function(mat1, mat2, epiMAF){
-
   pb2 <- txtProgressBar(min = 1, max = NROW(mat1), char = "=", style = 3, file = "")
-  mat1$epiMAF <- 0
-
-  mypatterns <- mat1[, 5:(NCOL(mat1) - 1)]
-  epiMAFs <- apply(mypatterns, 1, function(row) {
+  mypatterns <- mat1[, 4:(NCOL(mat1) - 1)]
+  epiMAFs <- apply(mypatterns, 1, function(row)
+  {
     mycount <- table(row)
     epiMAF.out <- min(mycount) / length(row)
     return(floorDec(as.numeric(as.character(epiMAF.out)), 5))
   })
   mat1$epiMAF <- epiMAFs
+
   Sys.sleep(1 / NROW(mat1))
   setTxtProgressBar(pb2, NROW(mat1))
   close(pb2)
@@ -105,7 +115,7 @@ filterEpiMAF <- function(mat1, mat2, epiMAF){
     df.rc.methlevel.collect <- mat2 %>% dplyr::semi_join(df.status.collect, by=c("seqnames","start","end"))
     return(list(df.status.collect, df.rc.methlevel.collect))
   } else {
-    message("\nEmpty dataframe. Nothing to write!")
+    message("Empty dataframe. Nothing to write!")
     return(NULL)
   }
 }
@@ -118,78 +128,60 @@ filterEpiMAF <- function(mat1, mat2, epiMAF){
 #' @import GenomicRanges
 #' @importFrom data.table fread
 #' @importFrom data.table fwrite
-#' @importFrom utils setTxtProgressBar txtProgressBar
+#' @importFrom data.table rbindlist
 #' @export
 #'
-merge.bins <- function(rcmethlvl, statecalls, rc.methlvl.out){
-  gap=1
+merge.bins <- function(rcmethlvl, statecalls)
+{
+  # split state call dataset into unique patterns of state calls among samples
+  states.all <- split(statecalls, apply(statecalls[, 4:NCOL(statecalls)], 1, paste, collapse = "_"))
+  rcmethlvl.all <- split(rcmethlvl, apply(statecalls[, 4:NCOL(statecalls)], 1, paste, collapse = "_"))
 
-  mylist <- list()
-  result <- list()
+  # merge overlapping bins having the same patterns among samples AND save the indices corresponding the merged windows
+  states.list <- lapply(states.all, function(x) {
+    data.list <- list()
+    # create a GRanges object
+    data <- GenomicRanges::makeGRangesFromDataFrame(x, keep.extra.columns = TRUE)
+    # merge overlapping bins
+    data.reduced <- GenomicRanges::reduce(data)
+    # find the indices of the overlapping bins
+    ovlps <- as.data.frame(GenomicRanges::findOverlaps(data, data.reduced))
+    # prepare dataset for the final step
+    data.reduced <- as.data.frame(data.reduced)
+    data.reduced <- data.reduced[,c(1,2,3)]
+    data.reduced <- cbind(data.reduced, x[1,4:NCOL(x)])
+    data.list[[1]] <- ovlps
+    data.list[[2]] <- data.reduced
+    return(data.list)
+  })
 
-  matrix1 <- as.data.frame(statecalls)
-  matrix2 <- as.data.frame(rcmethlvl)
+  # extract state calls and overlaps from the previous function
+  overlaps.data <- lapply(states.list, function(x) x[[1]])
+  states.data <- lapply(states.list, function(x) x[[2]])
 
-  # extract unique pattern
-  extract.pattern <- unique(matrix1[,(4:NCOL(matrix1))])
-  extract.pattern$pattern <- apply(extract.pattern[,c(1:NCOL(extract.pattern))], 1, paste, collapse="")
-
-  # the state call matrix
-  gr1 <- GenomicRanges::GRanges(seqnames=matrix1$seqnames, ranges=IRanges(start=matrix1$start, end=matrix1$end))
-  values(gr1) <- cbind(values(gr1), pattern=apply(matrix1[,c(4:NCOL(matrix1))], 1, paste, collapse=""))
-
-  message("Now, Merging overlapping and consecutive bins...")
-
-  # this is for the state-calls: collapse overlapping bins if pattern is same
-  grl_reduce <- unlist(GenomicRanges::reduce(split(gr1, gr1$pattern)))
-  result <- sort(grl_reduce)
-  result$pattern <- names(result)
-  result <- data.frame(result)
-  final.status.collect <- result %>% dplyr::left_join(extract.pattern, by=c("pattern"))
-
-  if (rc.methlvl.out==TRUE){
-    # the rcmethlvl matrix, also add the state-call pattern
-    gr2 <- GenomicRanges::GRanges(seqnames=matrix2$seqnames, ranges=IRanges(start=matrix2$start, end=matrix2$end))
-    values(gr2) <- cbind(values(gr2), values(gr1), as.data.frame(matrix2[,c(4:NCOL(matrix2))]))
-
-    # this is for the rcmethlvl: collapse bins and take average of the bins
-    mycols <- colnames(matrix1)[4:NCOL(matrix1)]
-    fn <- function(u){
-      out <- GenomicRanges::reduce(u)
-      for (x in 1:length(mycols)){
-        #eval(parse(text=paste0("out$", mycols[x], " = mean(u$", mycols[x], ")")))
-        eval(parse(text = paste0("out$`", mycols[x], "` = mean(u$`", mycols[x], "`)")))
-      }
-      return(out)
-    }
-    # split rcmthlvl matrix based on pattterns
-    grl <- split(gr2, gr2$pattern)
-
-    pb3 <- txtProgressBar(min = 1, max = length(grl), char = "=", style = 3, file = "")
-
-    mylist <- lapply(seq_along(grl), function(x) {
-      a <- data.frame(grl[[x]])
-      a1 <- a %>% dplyr::arrange(pattern, start) %>% dplyr::group_by(pattern) %>% dplyr::mutate(indx = cumsum(start > lag(end, default = start[1]) + gap))
-      a1.gr <- GenomicRanges::makeGRangesFromDataFrame(a1, keep.extra.columns = TRUE)
-      df <- lapply(split(a1.gr, a1.gr$indx), fn)
-      Sys.sleep(0.05)
-      setTxtProgressBar(pb3, x)
-      return(df)
+  # calculate the average methylation for each previously merged bin by using the overlaps dataset from the previous function
+  rcmethlvl.data <- lapply(seq_along(rcmethlvl.all), function(x) {
+    # extract methylation levels and overlaps for a given run
+    rcmethlvl.1 <- rcmethlvl.all[[x]]
+    ovlps.1 <- overlaps.data[[x]]
+    ovlps.1 <- split(ovlps.1, f = ovlps.1$subjectHits)
+    rcmethlvl.out <- lapply(ovlps.1, function(y) {
+      myv <- apply(rcmethlvl.1[y$queryHits,4:NCOL(rcmethlvl)], 2, mean)
+      mydf <- data.frame(t(myv), stringsAsFactors = FALSE)
+      colnames(mydf) <- names(myv)
+      return(mydf)
     })
-    close(pb3)
+    # bind mean methylation windows with state calls seqnames, start and end
+    rcmethlvl.out <- cbind(states.data[[x]][,1:3], data.table::rbindlist(rcmethlvl.out))
+    return(rcmethlvl.out)
+  })
 
-    f.df <- unlist(mylist)
-    f.df <- do.call(rbind, lapply(f.df, data.frame))
-    f.df <- f.df[order(f.df[,1], f.df[,2]),]
-    f.df[,(6:NCOL(f.df))] <- lapply(f.df[,(6:NCOL(f.df))], function(xy){ floorDec(xy,5) })
-    final.rcmethlvl.collect <- subset(f.df, select = -c(strand))
-    final.status.collect <- subset(final.status.collect, select = -c(strand, pattern))
-    return(list(final.status.collect, final.rcmethlvl.collect))
-  } else {
-    final.status.collect <- subset(final.status.collect, select = -c(strand, pattern))
-    final.rcmethlvl.collect <- NULL
-    return(list(final.status.collect, final.rcmethlvl.collect))
-  }
+  # prepare dataset to get it through next step of analysis
+  states.data <- data.table::rbindlist(states.data)
+  states.data <- states.data[order(seqnames, start, end), ]
+  rcmethlvl.data <- data.table::rbindlist(rcmethlvl.data)
+  rcmethlvl.data <- rcmethlvl.data[order(seqnames, start, end), ]
+  return(list(states.data, rcmethlvl.data))
 }
 #------------------------------------------------------------------------------------------------
 
@@ -203,7 +195,6 @@ export.out <- function(out.rcmethlvl, out.statecalls, context, out.name1, out.na
            quote=FALSE, row.names=FALSE, col.names=TRUE, sep="\t")
   } else {
     message("Generate filtered matrix of recalibrated methylation levels set to FALSE!")
-    message("------------------------------------------------------", "\n")
   }
 }
 
@@ -214,7 +205,6 @@ export.out <- function(out.rcmethlvl, out.statecalls, context, out.name1, out.na
 #' @param epiMAF.cutoff Numeric threshold to filter for minor epi-allele frequency. Applicable for population level data. By default this option is set to NULL. (NULL or numeric value between 0 and 1)
 #' @param replicate.consensus Numeric threshold as the percentage of concordance in methylation states among samples with multiple replicates. Applicable for control/treatment data. By default this option is set to NULL. (NULL or numeric value between 0 and 1)
 #' @param data.dir Path to the directory containing DMR matrix files. Looks for files with suffix("_StateCalls.txt" and "_rcMethlvl.txt"). (character)
-#' @param rc.methlvl.out Logical whether to output filtered matrix with methylation levels. By default this option is set to FALSE. (logical)
 #' @param samplefiles Path to the text file containing path to samples and sample names. For control/treatment data an additional column specifying the replicates is required. (character)
 #' @importFrom data.table fread
 #' @export
@@ -222,7 +212,6 @@ export.out <- function(out.rcmethlvl, out.statecalls, context, out.name1, out.na
 filterDMRmatrix <- function(epiMAF.cutoff=NULL,
                             replicate.consensus=NULL,
                             data.dir,
-                            rc.methlvl.out=FALSE,
                             samplefiles) {
 
   contexts <- unique(sub("_.*", "", list.files(data.dir, pattern = 'C')))
@@ -280,10 +269,10 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
 
       # if epiMAP and replicate cutoffs are set to NULL, we are only removing non-polymorphic patterns
       if (is.null(epiMAF.cutoff) && is.null(replicate.consensus)) {
-        message("Both, epiMAF and replicate consensus set to NULL")
+        message("Both, epiMAF and replicate consensus set to NULL. Merge corresponding bins")
         out1 <- status.collect
         out2 <- rc.methlevel.collect
-        out <- merge.bins(statecalls=out1, rcmethlvl=out2, rc.methlvl.out)
+        out <- merge.bins(statecalls=out1, rcmethlvl=out2)
         export.out(out.statecalls=out[[1]],
                    out.rcmethlvl=out[[2]],
                    context=context,
@@ -291,48 +280,44 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
                    out.name2="rcMethlvl-filtered",
                    data.out=data.dir)
       }
-      #----------------------------------------------
-      # Optional. Filtering out regions with epiMAF < Minor Allele Frequency
-      #----------------------------------------------
+
+      # filtering out regions with epiMAF < Minor Allele Frequency
       if (!is.null(epiMAF.cutoff)) {
-        message("Filtering for epiMAF: ", epiMAF.cutoff, "\n")
+        message("Filtering for epiMAF: ", epiMAF.cutoff, '...')
         mydf <- filterEpiMAF(mat1=status.collect, mat2=rc.methlevel.collect, epiMAF=epiMAF.cutoff)
-          if (!is.null(mydf)){
-            # For Population data remove the epiMAF column
-            out1 <- mydf[[1]][,-c("epiMAF")]
-            out2 <- mydf[[2]]
-            out <- merge.bins(statecalls=out1, rcmethlvl=out2, rc.methlvl.out)
-            export.out(out.statecalls=out[[1]],
-                       out.rcmethlvl=out[[2]],
-                       context=context,
-                       out.name1="StateCalls-filtered",
-                       out.name2="rcMethlvl-filtered",
-                       data.out=data.dir)
-          }
+        if (!is.null(mydf)){
+          # for population data remove the epiMAF column
+          out1 <- mydf[[1]][,-c("epiMAF")]
+          out2 <- mydf[[2]]
+          out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+          export.out(out.statecalls=out[[1]],
+                     out.rcmethlvl=out[[2]],
+                     context=context,
+                     out.name1="StateCalls-filtered",
+                     out.name2="rcMethlvl-filtered",
+                     data.out=data.dir)
         }
-        #----------------------------------------------
-        # Optional. Retaining samples based on replicate.consensus
-        #----------------------------------------------
-        if (!is.null(replicate.consensus)) {
-          message("Filtering for replicate consensus...\n")
-          mydf <- filterReplicateConsensus(status.collect, rc.methlevel.collect, replicate.consensus)
-          if (!is.null(mydf)){
-            out1 <- mydf[[1]]
-            out2 <- mydf[[2]]
-            out <- merge.bins(statecalls=out1, rcmethlvl=out2, rc.methlvl.out)
-            export.out(out.statecalls=out[[1]],
-                       out.rcmethlvl=out[[2]],
-                       context=context,
-                       out.name1="StateCalls-filtered",
-                       out.name2="rcMethlvl-filtered",
-                       data.out=data.dir)
-          }
+      }
+      # retaining samples based on replicate.consensus
+      if (!is.null(replicate.consensus)) {
+        message("Filtering for replicate consensus...")
+        mydf <- filterReplicateConsensus(status.collect, rc.methlevel.collect, replicate.consensus)
+        if (!is.null(mydf)){
+          out1 <- mydf[[1]]
+          out2 <- mydf[[2]]
+          out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+          export.out(out.statecalls=out[[1]],
+                     out.rcmethlvl=out[[2]],
+                     context=context,
+                     out.name1="StateCalls-filtered",
+                     out.name2="rcMethlvl-filtered",
+                     data.out=data.dir)
         }
+      }
     }
   } else {
     message("\nDMR matrix files do not exist!")
   }
-  #context.specific.DMRs(data.dir)
 }
 
 #------------------------------------------------------------------------------------------------
@@ -468,7 +453,7 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
         c=makeGRangesFromDataFrame(myrow.x[,c("CHH.seqnames","CHH.start","CHH.stop")])
         out1 <- GenomicRanges::intersect(a,b)
         out2 <- data.frame(GenomicRanges::intersect(out1,c))
-        if(NROW(out2)!=0){
+        if (NROW(out2)!=0){
           myrow.x$merged.seqnames <- out2$seqnames
           myrow.x$merged.start <- out2$start
           myrow.x$merged.stop <- out2$end
