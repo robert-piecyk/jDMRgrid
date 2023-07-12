@@ -11,7 +11,7 @@ export.bins <- function(mylist, myinfo, out.dir, runName)
   })
 }
 #-----------------------------------------------------------------------------------------
-#' @param model
+#' @param gr
 #' @param cyt_gr
 #' @param window.size
 #' @param step.size
