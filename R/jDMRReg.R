@@ -1,3 +1,19 @@
+#' @param model
+#' @param out.dir
+#' @param name
+#' @param distcor
+#' @param skip
+#' @param plot.parameters
+#' @param df
+#' @param refRegion
+#' @param context Cytosine context
+#' @param fit.plot
+#' @param fit.name
+#' @param refRegion
+#' @param include.intermediate
+#' @param probability
+#' @param mincov
+#' @param nCytosines
 #' @import ggplot2
 #' @importFrom minpack.lm nlsLM
 #' @importFrom grDevices dev.off pdf
