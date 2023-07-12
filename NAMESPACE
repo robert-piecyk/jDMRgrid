@@ -21,7 +21,7 @@ import(data.table)
 import(dplyr)
 import(ggplot2)
 import(utils)
-
+importFrom(GenomicRanges,slidingWindows)
 importFrom(GenomicRanges,findOverlaps)
 importFrom(GenomicRanges,intersect)
 importFrom(IRanges,subsetByOverlaps)
