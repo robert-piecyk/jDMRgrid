@@ -148,7 +148,7 @@ runjDMRgrid <- function(out.dir,
     refRegion <- dget(bin.select[[j]][[1]])
     refRegion <- list(reg.obs = refRegion)
 
-    vapply(seq_along(filelist$file), function(i) {
+    sapply(seq_along(filelist$file), function(i) {
       methfn <- gsub(".*methylome_|\\.txt|_All.txt$", "", filelist$file[i])
       message("Running file: ", methfn, " for context: ", names(bin.select)[j], "\n")
 
@@ -160,10 +160,10 @@ runjDMRgrid <- function(out.dir,
         include.intermediate = include.intermediate,
         probability = "constrained",
         out.dir = out.dir,
-        fit.name = paste0(methfn, "_", names(bin.select)[j]),
+        fit.name = paste0(basename(methfn), "_", names(bin.select)[j]),
         name = basename(methfn),
         mincov = mincov
       )
-    }, FUN.VALUE = character(1))
+    })
   })
 }
