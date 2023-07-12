@@ -134,7 +134,7 @@ modifiedExportMethylome <- function(model, out.dir, context, name) {
     final_dataset$seqnames <- as.character(final_dataset$seqnames)
 
     saveFile <- paste0(out.dir, "/", name, "_", context, ".txt")
-    fwrite(final_dataset, file = saveFile, quote = FALSE, sep = '\t', row.names = FALSE, col.names = TRUE)
+    data.table::fwrite(final_dataset, file = saveFile, quote = FALSE, sep = '\t', row.names = FALSE, col.names = TRUE)
     return (final_dataset)
 }
 
