@@ -69,7 +69,7 @@ makeDMRmatrix <- function(contexts=c("CG","CHG","CHH"), postMax.out=FALSE, sampl
       selectlist <- list()
       message("\nExtracting filenames and matching them....")
       for (a1 in seq_along(mynames)){
-        pat1 <- paste0("_",mynames[a1],"_","|","_",mynames[a1])
+        pat1 <- paste0("_",mynames[a1],"_","|","_",mynames[a1],"|",mynames[a1])
         #pat1 <- paste0("_",mynames[a1],"_")
         as <- samplelist[grepl(pat1, samplelist$file),]
         if (NROW(as)==1){
