@@ -161,7 +161,7 @@ runjDMRgrid <- function(out.dir,
         probability = "constrained",
         out.dir = out.dir,
         fit.name = paste0(methfn, "_", names(bin.select)[j]),
-        name = methfn,
+        name = basename(methfn),
         mincov = mincov
       )
     }, FUN.VALUE = character(1))
