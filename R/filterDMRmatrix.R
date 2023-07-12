@@ -296,6 +296,17 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
                      out.name1="StateCalls-filtered",
                      out.name2="rcMethlvl-filtered",
                      data.out=data.dir)
+        } else {
+          message('Filtering for epiMAF returns NULL dataset. Proceeding with the original dataset...')
+          out1 <- status.collect
+          out2 <- rc.methlevel.collect
+          out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+          export.out(out.statecalls=out[[1]],
+                     out.rcmethlvl=out[[2]],
+                     context=context,
+                     out.name1="StateCalls-filtered",
+                     out.name2="rcMethlvl-filtered",
+                     data.out=data.dir)
         }
       }
       # retaining samples based on replicate.consensus
@@ -305,6 +316,17 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
         if (!is.null(mydf)){
           out1 <- mydf[[1]]
           out2 <- mydf[[2]]
+          out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+          export.out(out.statecalls=out[[1]],
+                     out.rcmethlvl=out[[2]],
+                     context=context,
+                     out.name1="StateCalls-filtered",
+                     out.name2="rcMethlvl-filtered",
+                     data.out=data.dir)
+        } else {
+          message('Filtering for replicate consensus returns NULL dataset. Proceeding with the original dataset...')
+          out1 <- status.collect
+          out2 <- rc.methlevel.collect
           out <- merge.bins(statecalls=out1, rcmethlvl=out2)
           export.out(out.statecalls=out[[1]],
                      out.rcmethlvl=out[[2]],

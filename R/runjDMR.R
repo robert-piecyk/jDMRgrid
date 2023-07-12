@@ -83,6 +83,7 @@ binGenome <- function(methimputefiles,
     out <- out[order(out$bin.size, out$step.size),]
     out <- split(out, f = out$context)
     mybins <- out
+    data.table::fwrite(data.table::rbindlist(out), file = paste0(out.dir, '/', runName, '_optimal_minC_threshold.csv'))
     #mybins <- lapply(out, function(x) x[which.min(x$ratio),]) #deleted selection of the min ratio per context
     collect.bins <- lapply(results, function(x) x$collect.bins)
     message("Exporting regions...")

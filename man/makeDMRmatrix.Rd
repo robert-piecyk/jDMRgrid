@@ -5,7 +5,8 @@
 \title{Builds a DMR matrix for all samples}
 \usage{
 makeDMRmatrix(
-  context = c("CG", "CHG", "CHH"),
+  contexts = c("CG", "CHG", "CHH"),
+  postMax.out = FALSE,
   samplefiles,
   input.dir,
   out.dir,
@@ -13,8 +14,6 @@ makeDMRmatrix(
 )
 }
 \arguments{
-\item{context}{cytosine context}
-
 \item{samplefiles}{file containing full path of base level methylation calls, sample names and replicates(optional)}
 
 \item{input.dir}{input directory containing all region level methylome calls}
@@ -22,6 +21,8 @@ makeDMRmatrix(
 \item{out.dir}{output directory}
 
 \item{include.intermediate}{A logical specifying whether or not the intermediate component should be included in the HMM model.By default this option is set as FALSE.}
+
+\item{context}{cytosine context}
 }
 \description{
 This function generates a binary matrix, a matrix of recalibrated methylation levels and posterior probabilities for all samples.
