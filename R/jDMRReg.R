@@ -112,6 +112,8 @@ modified.estimateTransDist <- function(distcor, skip=2, plot.parameters=TRUE) {
 }
 
 #--------------------------------------------------------------------------
+#' @importFrom data.table fwrite
+#' @export
 modifiedExportMethylome <- function(model, out.dir, context, name) {
     #data <- model$data
     data <- model
