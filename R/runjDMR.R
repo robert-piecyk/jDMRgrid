@@ -151,7 +151,7 @@ runjDMRgrid <- function(out.dir,
     sapply(seq_along(filelist$file), function(i) {
       methfn <- gsub(".*methylome_|\\.txt|_All.txt$", "", filelist$file[i])
       message("Running file: ", methfn, " for context: ", names(bin.select)[j], "\n")
-
+      fileName <- basename(methfn)
       grid.out <- makeMethimpute(
         df = filelist$file[i],
         context = names(bin.select)[j],
@@ -161,7 +161,7 @@ runjDMRgrid <- function(out.dir,
         probability = "constrained",
         out.dir = out.dir,
         fit.name = paste0(basename(methfn), "_", names(bin.select)[j]),
-        name = basename(methfn),
+        name = fileName,
         mincov = mincov
       )
     })
