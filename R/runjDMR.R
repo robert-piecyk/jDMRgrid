@@ -13,7 +13,7 @@ export.bins <- function(mylist, myinfo, out.dir, runName)
 #-----------------------------------------------------------------------------------------
 processWindow <- function(window.size, step.size, gr, cyt_gr) {
   # Binning genome
-  binned.g <- GenomicRanges::slidingWindows(gr, width = window.size, step = step.size)
+  binned.g <- slidingWindows(gr, width = window.size, step = step.size)
   message("Binning genome with windows of: ", window.size, "bp and step-size of: ", step.size, "bp.")
   # Creating a data frame from the binned data
   dd <- data.frame(unlist(binned.g))
