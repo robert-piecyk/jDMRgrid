@@ -112,6 +112,7 @@ binGenome <- function(methimputefiles,
 #' @importFrom stringr str_remove_all
 #' @import dplyr
 #' @import methimpute
+#' @importFrom data.table fwrite
 #' @export
 #'
 runjDMRgrid <- function(out.dir,
