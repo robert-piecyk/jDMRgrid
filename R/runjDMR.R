@@ -11,10 +11,6 @@ export.bins <- function(mylist, myinfo, out.dir, runName)
   })
 }
 #-----------------------------------------------------------------------------------------
-#' @param gr
-#' @param cyt_gr
-#' @param window.size
-#' @param step.size
 processWindow <- function(window.size, step.size, gr, cyt_gr) {
   # Binning genome
   binned.g <- slidingWindows(gr, width = window.size, step = step.size)
