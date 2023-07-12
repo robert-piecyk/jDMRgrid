@@ -11,9 +11,9 @@ export.bins <- function(mylist, myinfo, out.dir, runName)
   })
 }
 #-----------------------------------------------------------------------------------------
-processWindow <- function(window.size, step.size) {
+processWindow <- function(window.size, step.size, gr, cyt_gr) {
   # Binning genome
-  binned.g <- slidingWindows(gr, width = window.size, step = step.size)
+  binned.g <- GenomicRanges::slidingWindows(gr, width = window.size, step = step.size)
   message("Binning genome with windows of: ", window.size, "bp and step-size of: ", step.size, "bp.")
   # Creating a data frame from the binned data
   dd <- data.frame(unlist(binned.g))
@@ -77,9 +77,9 @@ binGenome <- function(methimputefiles,
     results <- lapply(seq_along(window), function(x1) {
       window.size <- window[x1]
       step.size <- step[x1]
-      processWindow(window.size, step.size)
+      processWindow(window.size, step.size, gr, cyt_gr)
     })
-    out <- rbindlist(lapply(results, function(x) x$mydf))
+    out <- data.table::rbindlist(lapply(results, function(x) x$mydf))
     out <- out[order(out$bin.size, out$step.size),]
     out <- split(out, f = out$context)
     mybins <- out
@@ -110,6 +110,7 @@ binGenome <- function(methimputefiles,
 #' @param runName Name of the operation. By default this option is set to 'GridGenome'. (character)
 #' @importFrom data.table fread
 #' @importFrom stringr str_remove_all
+#' @import dplyr
 #' @export
 #'
 runjDMRgrid <- function(out.dir,
