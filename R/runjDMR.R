@@ -87,7 +87,7 @@ binGenome <- function(methimputefiles,
     #mybins <- lapply(out, function(x) x[which.min(x$ratio),]) #deleted selection of the min ratio per context
     collect.bins <- lapply(results, function(x) x$collect.bins)
     message("Exporting regions...")
-    lapply(mybins, function(x) export.bins(mylist=collect.bins,
+    lapply(mybins, function(x) export.bins(mylist=collect.bins[[1]],
                                            myinfo=x,
                                            out.dir=out.dir,
                                            runName=runName))
@@ -111,6 +111,7 @@ binGenome <- function(methimputefiles,
 #' @importFrom data.table fread
 #' @importFrom stringr str_remove_all
 #' @import dplyr
+#' @import methimpute
 #' @export
 #'
 runjDMRgrid <- function(out.dir,
