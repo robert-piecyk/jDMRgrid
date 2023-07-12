@@ -1,49 +1,3 @@
-#-----------------------------------------------------------------------------------------
-export.bins <- function(mylist, myinfo, out.dir, runName)
-{
-  lapply(seq_along(myinfo$bin.size), function(z1) {
-    window.size.1 <- myinfo$bin.size[z1]
-    step.size.1 <- myinfo$step.size[z1]
-    mylist.1 <- mylist[[as.character(window.size.1)]]
-    context.1 <- myinfo$context[z1]
-    out.name.1 <- paste0(out.dir, "/",runName,"_Win", window.size.1,"_Step", step.size.1,"_",context.1,".Rdata",sep="")
-    dput(mylist.1, out.name.1)
-  })
-}
-#-----------------------------------------------------------------------------------------
-processWindow <- function(window.size, step.size, gr, cyt_gr) {
-  # Binning genome
-  binned.g <- slidingWindows(gr, width = window.size, step = step.size)
-  message("Binning genome with windows of: ", window.size, "bp and step-size of: ", step.size, "bp.")
-  # Creating a data frame from the binned data
-  dd <- data.frame(unlist(binned.g))
-  names(dd) <- c("chr", "start", "end", "cluster.length", "strand")
-  # Storing the data frame in a list
-  new <- list(dd)
-  names(new) <- as.numeric(as.character(window.size))
-  # Creating a GRange object
-  data_gr <- GRanges(seqnames = dd$chr, ranges = IRanges(start = dd$start, end = dd$end), clusterlen = dd$cluster.length)
-  # Creating a data frame for bin and step sizes
-  mydf <- data.frame(bin.size = window.size, step.size = step.size)
-  # Process each context using lapply and combine the results
-  results <- lapply(contexts, function(cx) {
-    message("Extracting cytosines for ", cx, ".")
-    # Filtering cytosines
-    ref_gr <- cyt_gr[which(cyt_gr$context == cx),]
-    # Counting cytosines in GRanges
-    dat.collect <- GenomicRanges::countOverlaps(data_gr, ref_gr)
-    # Create a empirical distribution of cytosines within bins and find a threshold based on its min.C percentile
-    new.dat.collect <- dat.collect[(which(dat.collect >= as.numeric(quantile(ecdf(dat.collect), min.C/100))))]
-    non.empty.bins <- length(new.dat.collect) / length(dat.collect)
-    return(non.empty.bins)
-  })
-
-  # Add the results to the mydf data frame
-  mydf <- cbind(mydf, data.frame(context = contexts,
-                                 ratio = unlist(results)))
-  return(list(mydf = mydf, collect.bins = new))
-}
-#-----------------------------------------------------------------------------------------
 binGenome <- function(methimputefiles,
                       contexts,
                       window,
@@ -70,6 +24,38 @@ binGenome <- function(methimputefiles,
   names(chr.lengths) <- chr.names
   # create a GRanges object from the chromosome (fasta) start-end positions
   gr <- GRanges(seqnames=names(chr.lengths), ranges=IRanges(start=1, end=chr.lengths))
+  processWindow <- function(window.size, step.size) {
+    # Binning genome
+    binned.g <- slidingWindows(gr, width = window.size, step = step.size)
+    message("Binning genome with windows of: ", window.size, "bp and step-size of: ", step.size, "bp.")
+    # Creating a data frame from the binned data
+    dd <- data.frame(unlist(binned.g))
+    names(dd) <- c("chr", "start", "end", "cluster.length", "strand")
+    # Storing the data frame in a list
+    new <- list(dd)
+    names(new) <- as.numeric(as.character(window.size))
+    # Creating a GRange object
+    data_gr <- GRanges(seqnames = dd$chr, ranges = IRanges(start = dd$start, end = dd$end), clusterlen = dd$cluster.length)
+    # Creating a data frame for bin and step sizes
+    mydf <- data.frame(bin.size = window.size, step.size = step.size)
+    # Process each context using lapply and combine the results
+    results <- lapply(contexts, function(cx) {
+      message("Extracting cytosines for ", cx, ".")
+      # Filtering cytosines
+      ref_gr <- cyt_gr[which(cyt_gr$context == cx),]
+      # Counting cytosines in GRanges
+      dat.collect <- GenomicRanges::countOverlaps(data_gr, ref_gr)
+      # Create a empirical distribution of cytosines within bins and find a threshold based on its min.C percentile
+      new.dat.collect <- dat.collect[(which(dat.collect >= as.numeric(quantile(ecdf(dat.collect), min.C/100))))]
+      non.empty.bins <- length(new.dat.collect) / length(dat.collect)
+      return(non.empty.bins)
+    })
+
+    # Add the results to the mydf data frame
+    mydf <- cbind(mydf, data.frame(context = contexts,
+                                   ratio = unlist(results)))
+    return(list(mydf = mydf, collect.bins = new))
+  }
   # main loop function
   if (length(window) != length(step)) {
     message('EXECUTION HALTED! Window and step vectors sizes must have the same length.')
@@ -77,7 +63,7 @@ binGenome <- function(methimputefiles,
     results <- lapply(seq_along(window), function(x1) {
       window.size <- window[x1]
       step.size <- step[x1]
-      processWindow(window.size, step.size, gr, cyt_gr)
+      processWindow(window.size, step.size)
     })
     out <- data.table::rbindlist(lapply(results, function(x) x$mydf))
     out <- out[order(out$bin.size, out$step.size),]
@@ -87,6 +73,17 @@ binGenome <- function(methimputefiles,
     #mybins <- lapply(out, function(x) x[which.min(x$ratio),]) #deleted selection of the min ratio per context
     collect.bins <- lapply(results, function(x) x$collect.bins)
     message("Exporting regions...")
+    export.bins <- function(mylist, myinfo, out.dir, runName)
+    {
+      lapply(seq_along(myinfo$bin.size), function(z1) {
+        window.size.1 <- myinfo$bin.size[z1]
+        step.size.1 <- myinfo$step.size[z1]
+        mylist.1 <- mylist[[as.character(window.size.1)]]
+        context.1 <- myinfo$context[z1]
+        out.name.1 <- paste0(out.dir, "/",runName,"_Win", window.size.1,"_Step", step.size.1,"_",context.1,".Rdata",sep="")
+        dput(mylist.1, out.name.1)
+      })
+    }
     lapply(mybins, function(x) export.bins(mylist=collect.bins[[1]],
                                            myinfo=x,
                                            out.dir=out.dir,
@@ -114,9 +111,7 @@ binGenome <- function(methimputefiles,
 #' @import methimpute
 #' @importFrom data.table fwrite
 #' @importFrom IRanges slidingWindows
-#' @export binGenome
-#' @export processWindow
-#' @export export.bins
+#' @export
 #'
 runjDMRgrid <- function(out.dir,
                         window,
