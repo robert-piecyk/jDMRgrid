@@ -6,7 +6,6 @@ floorDec <- function(valParm ,x){
 }
 
 # Convert all String into U/I/M if there are full text.
-#' @importFrom stringr str_replace_all
 statusStringCheck <-  function(file_A){
   list_status <- c("Unmethylated", "Intermediate", "Methylated")
   strTocheckFileA <- utils::head(file_A$status[1])
