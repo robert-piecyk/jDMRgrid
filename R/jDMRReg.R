@@ -112,6 +112,7 @@ modified.estimateTransDist <- function(distcor, skip=2, plot.parameters=TRUE) {
 }
 
 #--------------------------------------------------------------------------
+#' @import data.table
 #' @importFrom data.table fwrite
 #' @export
 modifiedExportMethylome <- function(model, out.dir, context, name) {
@@ -136,7 +137,7 @@ modifiedExportMethylome <- function(model, out.dir, context, name) {
     final_dataset$seqnames <- as.character(final_dataset$seqnames)
 
     saveFile <- paste0(out.dir, "/", name, "_", context, ".txt")
-    data.table::fwrite(final_dataset, file = saveFile, quote = FALSE, sep = '\t', row.names = FALSE, col.names = TRUE)
+    fwrite(final_dataset, file = saveFile, quote = FALSE, sep = '\t', row.names = FALSE, col.names = TRUE)
     return (final_dataset)
 }
 
