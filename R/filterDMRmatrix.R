@@ -35,8 +35,8 @@ filterReplicateConsensus <- function(status.collect, rc.methlevel.collect, repli
         if (max(tt) >= rval){
           df.bind$count[df.bind$sample==m] <- 0
         } else {
-          df.bind$rows <- apply(df.bind, 1, function(row) {
-            m <- row[["sample"]]
+          df.bind_rows <- apply(df.bind, 1, function(row) {
+            m <- row[which(colnames(df.bind) == 'sample')]
             total.reps <- length(df.bind$mypattern[df.bind$sample == m])
             rval <- round(replicate.consensus * total.reps)
             pattern.vals <- df.bind$mypattern[df.bind$sample == m]
@@ -48,19 +48,23 @@ filterReplicateConsensus <- function(status.collect, rc.methlevel.collect, repli
               row[["count"]] <- 1
             }
             return(row)
-          })[df.bind$sample==m] <- 1
+          })
+          df.bind_rows <- as.data.frame(t(df.bind_rows))
+          df.bind_rows$mypattern <- as.numeric(df.bind_rows$mypattern)
+          df.bind_rows$diff.count <- as.numeric(df.bind_rows$diff.count)
+          df.bind_rows$count <- as.numeric(df.bind_rows$count)
         }
       }
       Sys.sleep(1/NROW(status.collect))
       setTxtProgressBar(pb1, x)
       close(pb1)
 
-      df.gp <- group_by(df.bind, sample) %>% summarize(n = mean(diff.count))
+      df.gp <- group_by(df.bind_rows, sample) %>% summarize(n = mean(diff.count))
       cb <- combn(df.gp$n,2)
       my.diff <- unlist(lapply(cb, function(x) abs(cb[1]-cb[2])))
 
       # allowing 50% difference between control and treatment groups
-      if ((min(my.diff) >= diff.ct) && (sum(df.bind$count)==0)) {
+      if ((min(my.diff) >= diff.ct) & (sum(df.bind_rows$count)==0)) {
         dt <- rbind(dt, status.collect[x,])
       }
       #print(df.bind)
@@ -96,6 +100,11 @@ filterReplicateConsensus <- function(status.collect, rc.methlevel.collect, repli
 #'
 
 filterEpiMAF <- function(mat1, mat2, epiMAF){
+  floorDec <- function(valParm ,x){
+    y <- function(x, level=1) round(x - 5*10^(-level-1), level)
+    res <-y(as.numeric(valParm),x)
+    return(res)
+  }
   pb2 <- txtProgressBar(min = 1, max = NROW(mat1), char = "=", style = 3, file = "")
   mypatterns <- mat1[, 4:(NCOL(mat1) - 1)]
   epiMAFs <- apply(mypatterns, 1, function(row)
@@ -232,7 +241,7 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
       out.name <- paste0(gp1.sample, "_", gp2.sample)
 
       list.collect1 <- lapply(seq_along(contexts), function(cn) {
-        fn1 <- paste0(data.dir, contexts[cn], "_", out.name, "_StateCalls.txt")
+        fn1 <- paste0(data.dir, '/', contexts[cn], "_", out.name, "_StateCalls.txt")
         return(fn1)
       })
       return(list.collect1)
@@ -506,9 +515,9 @@ context.specific.DMRs <- function(samplefiles, data.dir){
       gp1.sample <- unique(ft$sample[which(ft$name==gp1)])
       gp2.sample <- unique(ft$sample[which(ft$name==gp2)])
       message("Generating context specific DMRs for ", gp1.sample, "-", gp2.sample,"\n")
-      CG.f <- paste0(data.dir, ,"CG_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
-      CHG.f <- paste0(data.dir, ,"CHG_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
-      CHH.f <- paste0(data.dir, ,"CHH_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
+      CG.f <- paste0(data.dir, '/',"CG_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
+      CHG.f <- paste0(data.dir, '/',"CHG_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
+      CHH.f <- paste0(data.dir, '/',"CHH_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
       extract.context.DMRs(file1=CG.f,
                            file2=CHG.f,
                            file3=CHH.f,
