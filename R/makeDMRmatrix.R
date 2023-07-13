@@ -4,6 +4,7 @@
 #' @param include.intermediate
 #' @param mincov
 #' @param nCytosines
+#' @import magrittr
 #' @importFrom data.table fread
 #' @importFrom dplyr inner_join
 #' @export
@@ -51,6 +52,7 @@ write.out <- function(out.df, data.dir, out.name, contexts){
 #' @param include.intermediate A logical specifying whether or not the intermediate component should be included in the HMM model.By default this option is set as FALSE.
 #' @param input.dir input directory containing all region level methylome calls
 #' @param out.dir output directory
+#' @import magrittr
 #' @importFrom data.table fread
 #' @importFrom data.table fwrite
 #' @importFrom data.table rbindlist

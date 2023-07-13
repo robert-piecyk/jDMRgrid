@@ -103,6 +103,7 @@ annotate <- function(getAnno, mygff, mygr){
 #' @param gff.files multiple gff3 files can be supplied as a vector
 #' @param gff3.out a logical specifying whether output annotated files in gff3 format
 #' @param input.dir input directory containing filtered DMR matrix/matrices. Ideally any file containing 3 columns i.e (chr, start, stop) can be supplied.
+#' @import magrittr
 #' @importFrom GenomicRanges GRanges
 #' @importFrom  data.table fread
 #' @importFrom  data.table fwrite

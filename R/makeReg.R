@@ -13,6 +13,7 @@
 #' @param out.dir
 #' @param out.name
 #' @param makeRegnull
+#' @import magrittr
 #' @importFrom GenomicRanges GRanges reduce
 #' @importFrom utils setTxtProgressBar txtProgressBar
 #' @export

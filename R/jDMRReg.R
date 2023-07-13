@@ -15,6 +15,7 @@
 #' @param mincov
 #' @param nCytosines
 #' @import ggplot2
+#' @import magrittr
 #' @importFrom minpack.lm nlsLM
 #' @importFrom grDevices dev.off pdf
 #' @importFrom data.table fread
@@ -112,6 +113,7 @@ modified.estimateTransDist <- function(distcor, skip=2, plot.parameters=TRUE) {
 }
 
 #--------------------------------------------------------------------------
+#' @import magrittr
 #' @importFrom data.table fwrite
 #' @export
 modifiedExportMethylome <- function(model, out.dir, context, name) {

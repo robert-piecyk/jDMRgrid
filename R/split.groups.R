@@ -3,6 +3,7 @@
 #' @param contexts
 #' @param input.dir
 #' @param out.dir
+#' @param magrittr
 #' @importFrom data.table fread fwrite
 #' @importFrom dplyr inner_join
 #' @export
@@ -31,7 +32,7 @@ split.groups <- function(samplefiles, postMax.out=FALSE, contexts=c("CG","CHG","
                            col.names=TRUE,
                            sep="\t")
       }
-      
+
       fn2 <- paste0(input.dir, '/', contexts[cn], "_rcMethlvl.txt")
       if (file.exists(fn2)) {
         rcMethlvl <- data.table::fread(fn2)

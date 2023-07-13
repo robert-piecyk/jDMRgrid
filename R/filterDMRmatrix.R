@@ -2,6 +2,7 @@
 #' @param status.collect
 #' @param rc.methlevel.collect
 #' @param replicate.consensus
+#' @import magrittr
 #' @importFrom data.table fread
 #' @importFrom data.table rbindlist
 #' @importFrom dplyr semi_join summarize
@@ -94,6 +95,7 @@ filterReplicateConsensus <- function(status.collect, rc.methlevel.collect, repli
 #' @param mat1
 #' @param mat2
 #' @param epiMAF
+#' @import magrittr
 #' @importFrom dplyr semi_join
 #' @importFrom utils setTxtProgressBar txtProgressBar
 #' @export
@@ -134,6 +136,7 @@ filterEpiMAF <- function(mat1, mat2, epiMAF){
 #' @param rcmethlvl
 #' @param statecalls
 #' @param gap
+#' @import magrittr
 #' @importFrom GenomicRanges makeGRangesFromDataFrame
 #' @importFrom GenomicRanges reduce
 #' @importFrom GenomicRanges findOverlaps
@@ -217,6 +220,7 @@ export.out <- function(out.rcmethlvl, out.statecalls, context, out.name1, out.na
 #' @param replicate.consensus Numeric threshold as the percentage of concordance in methylation states among samples with multiple replicates. Applicable for control/treatment data. By default this option is set to NULL. (NULL or numeric value between 0 and 1)
 #' @param data.dir Path to the directory containing DMR matrix files. Looks for files with suffix("_StateCalls.txt" and "_rcMethlvl.txt"). (character)
 #' @param samplefiles Path to the text file containing path to samples and sample names. For control/treatment data an additional column specifying the replicates is required. (character)
+#' @import magrittr
 #' @importFrom data.table fread
 #' @export
 #'
@@ -363,6 +367,7 @@ DMR.list.out <- function(context.df, out.name, data.out){
 
 #------------------------------------------------------------------------------------------------
 #' @param data.dir
+#' @import magrittr
 #' @importFrom IRanges subsetByOverlaps
 #' @importFrom dplyr semi_join
 #' @importFrom GenomicRanges findOverlaps

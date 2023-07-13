@@ -102,6 +102,7 @@ binGenome <- function(methimputefiles,
 #' @param mincov Minimum read coverage over cytosines. By default this option is set as 0. (numeric value between 0 and 1)
 #' @param include.intermediate A logical specifying whether or not the intermediate component should be included in the HMM model. By default this option is set as FALSE. (logical)
 #' @param runName Name of the operation. By default this option is set to 'GridGenome'. (character)
+#' @import magrittr
 #' @importFrom data.table fread fwrite
 #' @importFrom stringr str_remove_all
 #' @importFrom data.table fwrite
