@@ -158,6 +158,6 @@ runjDMRgrid <- function(out.dir,
         name = fileName,
         mincov = mincov
       )
-    }, FUN.VALUE=1)
+    }, FUN.VALUE=0)
   })
 }
