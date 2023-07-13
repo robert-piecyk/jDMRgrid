@@ -169,10 +169,10 @@ split.groups <- function(samplefiles, postMax.out=FALSE, contexts=c("CG","CHG","
     gp2.sample <- unique(ft$sample[which(ft$name==gp2)])
     out.name <- paste0(gp1.sample, "_", gp2.sample)
     for (cn in seq_along(contexts)){
-      fn1 <- paste0(input.dir, contexts[cn], "_StateCalls.txt")
+      fn1 <- paste0(input.dir, '/', contexts[cn], "_StateCalls.txt")
       if (file.exists(fn1)) {
         StateCall <- fread(fn1)
-        df1 <- dplyr::select(StateCall, seqnames, start, end, gp1, gp2)
+        df1 <- subset(StateCall,, which(colnames(StateCall) %in% c('seqnames', 'start', 'end', gp1, gp2)))
         fwrite(x=df1,
                file=paste0(out.dir, "/", contexts[cn], "_", out.name, "_StateCalls.txt"),
                quote=FALSE,
@@ -181,10 +181,10 @@ split.groups <- function(samplefiles, postMax.out=FALSE, contexts=c("CG","CHG","
                sep="\t")
       }
 
-      fn2 <- paste0(input.dir, contexts[cn], "_rcMethlvl.txt")
+      fn2 <- paste0(input.dir, '/', contexts[cn], "_rcMethlvl.txt")
       if (file.exists(fn2)) {
         rcMethlvl <- fread(fn2)
-        df2 <- dplyr::select(rcMethlvl, seqnames, start, end, gp1, gp2)
+        df2 <- subset(rcMethlvl,, which(colnames(rcMethlvl) %in% c('seqnames', 'start', 'end', gp1, gp2)))
         fwrite(x=df2,
                file=paste0(out.dir, "/", contexts[cn],"_", out.name, "_rcMethlvl.txt"),
                quote=FALSE,
@@ -193,10 +193,10 @@ split.groups <- function(samplefiles, postMax.out=FALSE, contexts=c("CG","CHG","
                sep="\t")
       }
       if (postMax.out==TRUE){
-        fn3 <- paste0(input.dir, contexts[cn], "_postMax.txt")
+        fn3 <- paste0(input.dir, '/', contexts[cn], "_postMax.txt")
         if (file.exists(fn3)) {
           postMax <- fread(fn3)
-          df3 <- dplyr::select(postMax, seqnames, start, end, gp1, gp2)
+          df3 <- subset(postMax,, which(colnames(postMax) %in% c('seqnames', 'start', 'end', gp1, gp2)))
           fwrite(x=df3,
                  file=paste0(out.dir, "/", contexts[cn], "_", out.name, "_postMax.txt"),
                  quote=FALSE,
