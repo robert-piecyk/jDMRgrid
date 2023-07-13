@@ -60,6 +60,7 @@ gff3.out <- function(annotation, grangesObj, gff, name, out.dir) {
 #' @importFrom GenomicRanges findOverlaps
 #' @importFrom GenomicRanges subsetByOverlaps
 #' @importFrom IRanges CharacterList
+#' @importFrom ape read.gff
 #' @import dplyr
 #' @export
 #' @return annotated list
