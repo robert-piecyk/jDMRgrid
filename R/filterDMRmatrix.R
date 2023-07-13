@@ -434,7 +434,6 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
 
     #non-CG
     message("Generating non-CG DMRs...")
-    nonCG.collect <- list()
     overlaps.nonCG <- GenomicRanges::findOverlaps(CHG.gr, CHH.gr, ignore.strand=TRUE)
     overlaps.hits.nonCG <- IRanges::subsetByOverlaps(CHG.gr, CHH.gr)
     mcols(overlaps.hits.nonCG)$DMRs.CHH.coord<- IRanges::CharacterList(split(CHH.gr[subjectHits(overlaps.nonCG)], queryHits(overlaps.nonCG)))
@@ -454,14 +453,13 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
     nonCG.collect$merged.seqnames <- out0$seqnames
     nonCG.collect$merged.start <- out0$start
     nonCG.collect$merged.stop <- out0$end
-    DMR.list.out(context.df=data.table::rbindlist(nonCG.collect),
+    DMR.list.out(context.df=nonCG.collect,
                  out.name=paste0(tmp.name,"nonCG-DMRs"),
                  data.out=data.dir)
     message("Done!\n")
 
     #multi-context
     message("Generating multi-context DMRs...")
-    multi.context.collect <- list()
     overlaps.1 <- GenomicRanges::findOverlaps(CG.gr, CHG.gr, ignore.strand=TRUE)
     overlaps.hits.1 <- IRanges::subsetByOverlaps(CG.gr, CHG.gr)
     mcols(overlaps.hits.1)$DMRs.CHG.coord <- IRanges::CharacterList(split(CHG.gr[subjectHits(overlaps.1)], queryHits(overlaps.1)))
