@@ -507,7 +507,7 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
   }
 }
 
-context.specific.DMRs <- function(samplefiles, data.dir){
+context.specific.DMRs <- function(samplefiles, input.dir, output.dir){
   ft <- fread(samplefiles)
   if (!is.null(ft$group)){
     ft$name <- paste0(ft$sample,"_", ft$replicate)
@@ -521,22 +521,22 @@ context.specific.DMRs <- function(samplefiles, data.dir){
       gp1.sample <- unique(ft$sample[which(ft$name==gp1)])
       gp2.sample <- unique(ft$sample[which(ft$name==gp2)])
       message("Generating context specific DMRs for ", gp1.sample, "-", gp2.sample,"\n")
-      CG.f <- paste0(data.dir, '/',"CG_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
-      CHG.f <- paste0(data.dir, '/',"CHG_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
-      CHH.f <- paste0(data.dir, '/',"CHH_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
+      CG.f <- paste0(input.dir, '/',"CG_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
+      CHG.f <- paste0(input.dir, '/',"CHG_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
+      CHH.f <- paste0(input.dir, '/',"CHH_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
       extract.context.DMRs(file1=CG.f,
                            file2=CHG.f,
                            file3=CHH.f,
                            tmp.name=paste0(gp1.sample, "_", gp2.sample, "_"),
-                           data.dir=data.dir)
+                           data.dir=output.dir)
     }
   } else {
     message("Generating context specific DMRs. No groups found!\n")
-    output <- extract.context.DMRs(file1=paste0(data.dir,"/CG_StateCalls-filtered.txt"),
-                                   file2=paste0(data.dir,"/CHG_StateCalls-filtered.txt"),
-                                   file3=paste0(data.dir,"/CHH_StateCalls-filtered.txt"),
+    output <- extract.context.DMRs(file1=paste0(input.dir,"/CG_StateCalls-filtered.txt"),
+                                   file2=paste0(input.dir,"/CHG_StateCalls-filtered.txt"),
+                                   file3=paste0(input.dir,"/CHH_StateCalls-filtered.txt"),
                                    tmp.name="",
-                                   data.dir=data.dir)
+                                   data.dir=output.dir)
   }
 }
 
