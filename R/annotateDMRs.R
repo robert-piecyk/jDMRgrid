@@ -156,8 +156,8 @@ annotateDMRs <- function(annotation, gff.files, gff3.out, input.dir, out.dir) {
         # count the DMR overlaps; the output can be used to make a barplot or pie-chart
         # unique annotation overlaps
 
-        out.1 <- out[which(sapply(strsplit(out$type,','), uniqueN)==1),]
-        out.2 <- out[which(sapply(strsplit(out$type,','), uniqueN)>=2),]
+        out.1 <- out[which(sapply(strsplit(out$type,','), unique)==1),]
+        out.2 <- out[which(sapply(strsplit(out$type,','), unique)>=2),]
 
         #counting unique annotations
         for (k2 in seq_along(annotation)){
