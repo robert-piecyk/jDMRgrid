@@ -447,21 +447,13 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
     colnames(nonCG.clean)[2] <- "CHG.start"
     colnames(nonCG.clean)[3] <- "CHG.stop"
 
-    pb4 <- txtProgressBar(min = 1, max = NROW(nonCG.clean), char = "=", style = 3, file = "")
-
-    for (i1 in 1:NROW(nonCG.clean)){
-      myrow <- nonCG.clean[i1,]
-      a=GenomicRanges::makeGRangesFromDataFrame(myrow[,c("CHG.seqnames","CHG.start","CHG.stop")])
-      b=GenomicRanges::makeGRangesFromDataFrame(myrow[,c("CHH.seqnames","CHH.start","CHH.stop")])
-      out <- data.frame(GenomicRanges::intersect(a,b))
-      myrow$merged.seqnames <- out$seqnames
-      myrow$merged.start <- out$start
-      myrow$merged.stop <- out$end
-      nonCG.collect[[i1]] <- data.frame(myrow)
-      Sys.sleep(1/NROW(nonCG.clean))
-      setTxtProgressBar(pb4, i1)
-    }
-    close(pb4)
+    b <- GenomicRanges::makeGRangesFromDataFrame(nonCG.clean[, c("CHG.seqnames", "CHG.start", "CHG.stop")])
+    c <- GenomicRanges::makeGRangesFromDataFrame(nonCG.clean[, c("CHH.seqnames", "CHH.start", "CHH.stop")])
+    out0 <- data.frame(GenomicRanges::intersect(b, c))
+    nonCG.collect <- data.frame(matrix(NA, nrow(out0), 0))
+    nonCG.collect$merged.seqnames <- out0$seqnames
+    nonCG.collect$merged.start <- out0$start
+    nonCG.collect$merged.stop <- out0$end
     DMR.list.out(context.df=data.table::rbindlist(nonCG.collect),
                  out.name=paste0(tmp.name,"nonCG-DMRs"),
                  data.out=data.dir)

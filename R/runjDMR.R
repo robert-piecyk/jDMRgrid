@@ -142,7 +142,7 @@ runjDMRgrid <- function(out.dir,
     refRegion <- dget(bin.select[[j]][[1]])
     refRegion <- list(reg.obs = refRegion)
 
-    sapply(seq_along(filelist$file), function(i) {
+    info <- sapply(seq_along(filelist$file), function(i) {
       methfn <- gsub(".*methylome_|\\.txt|_All.txt$", "", filelist$file[i])
       message("Running file: ", methfn, " for context: ", names(bin.select)[j], "\n")
       fileName <- basename(methfn)
