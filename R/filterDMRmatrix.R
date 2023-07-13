@@ -472,27 +472,14 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
       colnames(multi.context.2.clean)[2] <- "CG.start"
       colnames(multi.context.2.clean)[3] <- "CG.stop"
 
-      pb5 <- txtProgressBar(min = 1, max = NROW(multi.context.2.clean), char = "=", style = 3, file = "")
-
-      for (i2 in 1:NROW(multi.context.2.clean)){
-        myrow.x <- multi.context.2.clean[i2,]
-        a=GenomicRanges::makeGRangesFromDataFrame(myrow.x[,c("CG.seqnames","CG.start","CG.stop")])
-        b=GenomicRanges::makeGRangesFromDataFrame(myrow.x[,c("CHG.seqnames","CHG.start","CHG.stop")])
-        c=GenomicRanges::makeGRangesFromDataFrame(myrow.x[,c("CHH.seqnames","CHH.start","CHH.stop")])
-        out1 <- GenomicRanges::intersect(a,b)
-        out2 <- data.frame(GenomicRanges::intersect(out1,c))
-        if (NROW(out2)!=0){
-          myrow.x$merged.seqnames <- out2$seqnames
-          myrow.x$merged.start <- out2$start
-          myrow.x$merged.stop <- out2$end
-          multi.context.collect[[i2]] <- data.frame(myrow.x)
-        }
-        Sys.sleep(1/NROW(multi.context.2.clean))
-        setTxtProgressBar(pb5, i2)
-      }
-      close(pb5)
-      f <- data.table::rbindlist(multi.context.collect)
-
+      a <- GenomicRanges::makeGRangesFromDataFrame(multi.context.2.clean[, c("CG.seqnames", "CG.start", "CG.stop")])
+      b <- GenomicRanges::makeGRangesFromDataFrame(multi.context.2.clean[, c("CHG.seqnames", "CHG.start", "CHG.stop")])
+      c <- GenomicRanges::makeGRangesFromDataFrame(multi.context.2.clean[, c("CHH.seqnames", "CHH.start", "CHH.stop")])
+      out2 <- data.frame(GenomicRanges::intersect(GenomicRanges::intersect(a, b), c))
+      multi.context.collect <- data.frame(matrix(NA, nrow(out2), 0))
+      multi.context.collect$merged.seqnames <- out2$seqnames
+      multi.context.collect$merged.start <- out2$start
+      multi.context.collect$merged.stop <- out2$end
       DMR.list.out(context.df=f,
                    out.name=paste0(tmp.name, "multi-context-DMRs"),
                    data.out=data.dir)
@@ -519,9 +506,9 @@ context.specific.DMRs <- function(samplefiles, data.dir){
       gp1.sample <- unique(ft$sample[which(ft$name==gp1)])
       gp2.sample <- unique(ft$sample[which(ft$name==gp2)])
       message("Generating context specific DMRs for ", gp1.sample, "-", gp2.sample,"\n")
-      CG.f <- paste0(data.dir, "CG_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
-      CHG.f <- paste0(data.dir, "CHG_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
-      CHH.f <- paste0(data.dir, "CHH_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
+      CG.f <- paste0(data.dir, ,"CG_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
+      CHG.f <- paste0(data.dir, ,"CHG_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
+      CHH.f <- paste0(data.dir, ,"CHH_", gp1.sample, "_", gp2.sample, "_StateCalls-filtered.txt")
       extract.context.DMRs(file1=CG.f,
                            file2=CHG.f,
                            file3=CHH.f,
@@ -530,9 +517,9 @@ context.specific.DMRs <- function(samplefiles, data.dir){
     }
   } else {
     message("Generating context specific DMRs. No groups found!\n")
-    output <- extract.context.DMRs(file1=paste0(data.dir,"CG_StateCalls-filtered.txt"),
-                                   file2=paste0(data.dir,"CHG_StateCalls-filtered.txt"),
-                                   file3=paste0(data.dir,"CHH_StateCalls-filtered.txt"),
+    output <- extract.context.DMRs(file1=paste0(data.dir,"/CG_StateCalls-filtered.txt"),
+                                   file2=paste0(data.dir,"/CHG_StateCalls-filtered.txt"),
+                                   file3=paste0(data.dir,"/CHH_StateCalls-filtered.txt"),
                                    tmp.name="",
                                    data.dir=data.dir)
   }
