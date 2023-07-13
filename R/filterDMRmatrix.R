@@ -4,7 +4,7 @@
 #' @param replicate.consensus
 #' @importFrom data.table fread
 #' @importFrom data.table rbindlist
-#' @importFrom dplyr semi_join
+#' @importFrom dplyr semi_join summarize
 #' @importFrom utils setTxtProgressBar txtProgressBar
 #' @export
 #'
@@ -59,7 +59,7 @@ filterReplicateConsensus <- function(status.collect, rc.methlevel.collect, repli
       setTxtProgressBar(pb1, x)
       close(pb1)
 
-      df.gp <- group_by(df.bind_rows, sample) %>% summarize(n = mean(diff.count))
+      df.gp <- group_by(df.bind_rows, sample) %>% dplyr::summarize(n = mean(diff.count))
       cb <- combn(df.gp$n,2)
       my.diff <- unlist(lapply(cb, function(x) abs(cb[1]-cb[2])))
 
