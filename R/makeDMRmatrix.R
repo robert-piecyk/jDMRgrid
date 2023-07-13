@@ -4,6 +4,7 @@
 #' @param include.intermediate
 #' @param mincov
 #' @param nCytosines
+#' @importFrom data.table fread
 #' @importFrom dplyr inner_join
 #' @export
 #'
@@ -15,7 +16,7 @@ merge.cols <- function(filepath, colm, include.intermediate) {
   mylist <- list()
   for (l in 1:length(colm)){
     extract <- lapply(filepath, function(k){
-      f <- fread(k, header=FALSE, skip=1, select=c(1, 2, 3, colm[l]))
+      f <- data.table::fread(k, header=FALSE, skip=1, select=c(1, 2, 3, colm[l]))
       if (colm[l]==6) {
         if (include.intermediate==TRUE) {
           f[,4] <- ifelse(f[,4] == "U", yes = 0, (ifelse(f[,4] == "I", yes = 0.5, no = 1)))
@@ -37,7 +38,7 @@ merge.cols <- function(filepath, colm, include.intermediate) {
 }
 
 write.out <- function(out.df, data.dir, out.name, contexts){
-  fwrite(x=out.df, file=paste0(data.dir,"/", contexts,"_",out.name,".txt"),
+  data.table::fwrite(x=out.df, file=paste0(data.dir,"/", contexts,"_",out.name,".txt"),
          quote=FALSE, row.names=FALSE, col.names=TRUE, sep="\t")
 }
 
@@ -157,7 +158,7 @@ makeDMRmatrix <- function(contexts=c("CG","CHG","CHH"), postMax.out=FALSE, sampl
 }
 
 split.groups <- function(samplefiles, postMax.out=FALSE, contexts=c("CG","CHG","CHH"), input.dir, out.dir){
-  ft <- fread(samplefiles)
+  ft <- data.table::fread(samplefiles)
   ft$name <- paste0(ft$sample,"_", ft$replicate)
   gps <- ft$group[!ft$group %in% c('control')]
   gps <- unique(gps)
@@ -171,9 +172,9 @@ split.groups <- function(samplefiles, postMax.out=FALSE, contexts=c("CG","CHG","
     for (cn in seq_along(contexts)){
       fn1 <- paste0(input.dir, '/', contexts[cn], "_StateCalls.txt")
       if (file.exists(fn1)) {
-        StateCall <- fread(fn1)
+        StateCall <- data.table::fread(fn1)
         df1 <- subset(StateCall,, which(colnames(StateCall) %in% c('seqnames', 'start', 'end', gp1, gp2)))
-        fwrite(x=df1,
+        data.table::fwrite(x=df1,
                file=paste0(out.dir, "/", contexts[cn], "_", out.name, "_StateCalls.txt"),
                quote=FALSE,
                row.names=FALSE,
@@ -183,9 +184,9 @@ split.groups <- function(samplefiles, postMax.out=FALSE, contexts=c("CG","CHG","
 
       fn2 <- paste0(input.dir, '/', contexts[cn], "_rcMethlvl.txt")
       if (file.exists(fn2)) {
-        rcMethlvl <- fread(fn2)
+        rcMethlvl <- data.table::fread(fn2)
         df2 <- subset(rcMethlvl,, which(colnames(rcMethlvl) %in% c('seqnames', 'start', 'end', gp1, gp2)))
-        fwrite(x=df2,
+        data.table::fwrite(x=df2,
                file=paste0(out.dir, "/", contexts[cn],"_", out.name, "_rcMethlvl.txt"),
                quote=FALSE,
                row.names=FALSE,
@@ -195,9 +196,9 @@ split.groups <- function(samplefiles, postMax.out=FALSE, contexts=c("CG","CHG","
       if (postMax.out==TRUE){
         fn3 <- paste0(input.dir, '/', contexts[cn], "_postMax.txt")
         if (file.exists(fn3)) {
-          postMax <- fread(fn3)
+          postMax <- data.table::fread(fn3)
           df3 <- subset(postMax,, which(colnames(postMax) %in% c('seqnames', 'start', 'end', gp1, gp2)))
-          fwrite(x=df3,
+          data.table::fwrite(x=df3,
                  file=paste0(out.dir, "/", contexts[cn], "_", out.name, "_postMax.txt"),
                  quote=FALSE,
                  row.names=FALSE,

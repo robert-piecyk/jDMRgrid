@@ -15,13 +15,15 @@
 #' @param mincov
 #' @param nCytosines
 #' @import ggplot2
-#' @import GenomicRanges
 #' @importFrom minpack.lm nlsLM
 #' @importFrom grDevices dev.off pdf
 #' @importFrom data.table fread
 #' @importFrom data.table fwrite
 #' @importFrom stringr str_replace_all
+#' @importFrom dplyr bind_rows filter
 #' @importFrom stats na.omit coefficients
+#' @importFrom GenomicRanges GRanges findOverlaps
+#' @importFrom S4Vectors queryHits subjectHits
 #' @importFrom methimpute callMethylation
 #' @importFrom methimpute distanceCorrelation
 #' @export
@@ -110,7 +112,6 @@ modified.estimateTransDist <- function(distcor, skip=2, plot.parameters=TRUE) {
 }
 
 #--------------------------------------------------------------------------
-#' @import data.table
 #' @importFrom data.table fwrite
 #' @export
 modifiedExportMethylome <- function(model, out.dir, context, name) {
@@ -136,7 +137,7 @@ modifiedExportMethylome <- function(model, out.dir, context, name) {
 
     saveFile <- paste0(out.dir, "/", basename(name), "_", context, ".txt")
 
-    fwrite(final_dataset, file = saveFile, quote = FALSE, sep = '\t', row.names = FALSE, col.names = TRUE)
+    data.table::fwrite(final_dataset, file = saveFile, quote = FALSE, sep = '\t', row.names = FALSE, col.names = TRUE)
     return (final_dataset)
 }
 
@@ -161,12 +162,12 @@ makeRegionsImpute <- function(df, context, refRegion, mincov, nCytosines) {
 
   ref_data <- ref_data[which(ref_data$V4==context),]
 
-  data_gr <- GRanges(seqnames=data$chr,
+  data_gr <- GenomicRanges::GRanges(seqnames=data$chr,
                      ranges=IRanges(start=data$start, end=data$end),
                      clusterlen=data$cluster.length,
                      context=as.factor(context))
 
-  ref_gr <- GRanges(seqnames=ref_data$V1,
+  ref_gr <- GenomicRanges::GRanges(seqnames=ref_data$V1,
                     ranges=IRanges(start=ref_data$V2, width=1),
                     context=as.factor(context),
                     methylated=ref_data$V5,

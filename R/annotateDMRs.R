@@ -24,7 +24,7 @@ gff3.in <- function(gff){
 #' @param grangesObj
 #' @param name
 #' @param out.dir output directory
-#' @import GenomicRanges
+#' @importFrom GenomicRanges findOverlaps
 #' @importFrom  rtracklayer export.gff
 #' @export
 #' @return export output files in gff3 format
@@ -58,7 +58,10 @@ gff3.out <- function(annotation, grangesObj, gff, name, out.dir) {
 #' @param gff.files
 #' @param gff3.out
 #' @param input.dir
-#' @import  GenomicRanges
+#' @importFrom GenomicRanges findOverlaps
+#' @importFrom GenomicRanges subsetByOverlaps
+#' @importFrom IRanges CharacterList
+#' @import dplyr
 #' @export
 #' @return annotated list
 #extract annotated regions
@@ -100,9 +103,10 @@ annotate <- function(getAnno, mygff, mygr){
 #' @param gff.files multiple gff3 files can be supplied as a vector
 #' @param gff3.out a logical specifying whether output annotated files in gff3 format
 #' @param input.dir input directory containing filtered DMR matrix/matrices. Ideally any file containing 3 columns i.e (chr, start, stop) can be supplied.
-#' @import GenomicRanges
+#' @importFrom GenomicRanges GRanges
 #' @importFrom  data.table fread
 #' @importFrom  data.table fwrite
+#' @importFrom  data.table rbindlist
 #' @importFrom  dplyr group_by
 #' @importFrom  dplyr summarize
 #' @export

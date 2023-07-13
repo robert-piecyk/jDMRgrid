@@ -13,7 +13,7 @@
 #' @param out.dir
 #' @param out.name
 #' @param makeRegnull
-#' @import GenomicRanges
+#' @importFrom GenomicRanges GRanges reduce
 #' @importFrom utils setTxtProgressBar txtProgressBar
 #' @export
 #'
@@ -280,8 +280,8 @@ makeReg<-function(ref.genome, contexts, chr, min.C, N.boot, N.sim.C, fp.rate, se
       reg.obs.minus<-conReg(seq.in=obs.geno.minus, min.C=min.C, win=null.dist, chr=chr)
       df <- data.frame(id=c(rep("+", nrow(reg.obs.plus)), rep("-", nrow(reg.obs.minus))),
                        start=c(reg.obs.plus[,2], reg.obs.minus[,2]), end=c(reg.obs.plus[,3], reg.obs.minus[,3]))
-      gr <- GRanges(seqnames = rep(1,nrow(df)),IRanges(start = df$start, end = df$end))
-      reg.obs<-as.data.frame(reduce(gr))[,1:3]
+      gr <- GenomicRanges::GRanges(seqnames = rep(1,nrow(df)),IRanges(start = df$start, end = df$end))
+      reg.obs<-as.data.frame(GenomicRanges::reduce(gr))[,1:3]
       reg.obs[,1]<-rep(chr, nrow(reg.obs))
       reg.obs$cluster.length <- reg.obs$end - reg.obs$start
       reg.obs$region<-paste("reg", 1:nrow(reg.obs), sep="")
@@ -382,8 +382,8 @@ makeReg<-function(ref.genome, contexts, chr, min.C, N.boot, N.sim.C, fp.rate, se
       reg.obs.minus<-conReg(seq.in=obs.geno.minus, min.C=min.C, win=null.dist, chr=chr)
       df <- data.frame(id=c(rep("+", nrow(reg.obs.plus)), rep("-", nrow(reg.obs.minus))),
                        start=c(reg.obs.plus[,2], reg.obs.minus[,2]), end=c(reg.obs.plus[,3], reg.obs.minus[,3]))
-      gr <- GRanges(seqnames = rep(1,nrow(df)),IRanges(start = df$start, end = df$end))
-      reg.obs<-as.data.frame(reduce(gr))[,1:3]
+      gr <- GenomicRanges::GRanges(seqnames = rep(1,nrow(df)),IRanges(start = df$start, end = df$end))
+      reg.obs<-as.data.frame(GenomicRanges::reduce(gr))[,1:3]
       reg.obs[,1]<-rep(chr, nrow(reg.obs))
       reg.obs$cluster.length <- reg.obs$end - reg.obs$start
       reg.obs$region<-paste("reg", 1:nrow(reg.obs), sep="")

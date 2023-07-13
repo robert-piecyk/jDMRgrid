@@ -125,7 +125,9 @@ filterEpiMAF <- function(mat1, mat2, epiMAF){
 #' @param rcmethlvl
 #' @param statecalls
 #' @param gap
-#' @import GenomicRanges
+#' @importFrom GenomicRanges makeGRangesFromDataFrame
+#' @importFrom GenomicRanges reduce
+#' @importFrom GenomicRanges findOverlaps
 #' @importFrom data.table fread
 #' @importFrom data.table fwrite
 #' @importFrom data.table rbindlist
@@ -186,11 +188,11 @@ merge.bins <- function(rcmethlvl, statecalls)
 #------------------------------------------------------------------------------------------------
 
 export.out <- function(out.rcmethlvl, out.statecalls, context, out.name1, out.name2, data.out){
-  fwrite(x=out.statecalls,
+  data.table::fwrite(x=out.statecalls,
          file=paste0(data.out, "/", context, "_", out.name1, ".txt"),
          quote=FALSE, row.names=FALSE, col.names=TRUE, sep="\t")
   if (!is.null(out.rcmethlvl)) {
-    fwrite(x=out.rcmethlvl,
+    data.table::fwrite(x=out.rcmethlvl,
            file=paste0(data.out, "/", context, "_", out.name2, ".txt"),
            quote=FALSE, row.names=FALSE, col.names=TRUE, sep="\t")
   } else {
@@ -215,7 +217,7 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
                             samplefiles) {
 
   contexts <- unique(sub("_.*", "", list.files(data.dir, pattern = 'C')))
-  ft <- fread(samplefiles)
+  ft <- data.table::fread(samplefiles)
   if (!is.null(ft$group)){
     ft$name <- paste0(ft$sample,"_", ft$replicate)
     gps <- ft$group[!ft$group %in% c('control')]
@@ -247,7 +249,7 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
 
       # read a given state calls file
       if (file.exists(list.status[i])){
-        status.collect  <- fread(list.status[i], header=T)
+        status.collect  <- data.table::fread(list.status[i], header=T)
       } else {
         stop("Files do not exist or is non-readable!")
       }
@@ -264,7 +266,7 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
 
       # read a corresponding methylation file and update it using indices from the previous step
       rc.methlvl.name <- paste0(data.dir, "/", context, "_rcMethlvl.txt")
-      rc.methlevel.collect <- fread(rc.methlvl.name, header=T)
+      rc.methlevel.collect <- data.table::fread(rc.methlvl.name, header=T)
       rc.methlevel.collect <- rc.methlevel.collect[index,]
 
       # if epiMAP and replicate cutoffs are set to NULL, we are only removing non-polymorphic patterns
@@ -345,7 +347,7 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
 #------------------------------------------------------------------------------------------------
 
 DMR.list.out <- function(context.df, out.name, data.out){
-  fwrite(x=context.df,
+  data.table::fwrite(x=context.df,
          file=paste0(data.out, "/", out.name,".txt"),
          quote=FALSE, row.names=FALSE, col.names=TRUE, sep="\t")
 }
@@ -358,10 +360,14 @@ DMR.list.out <- function(context.df, out.name, data.out){
 #' @importFrom data.table rbindlist
 #' @importFrom data.table fread
 #' @importFrom GenomicRanges intersect
+#' @importFrom GenomicRanges GRanges
+#' @importFrom GenomicRanges makeGRangesFromDataFrame
 #' @importFrom tidyr separate
 #' @importFrom tidyr unnest
 #' @importFrom dplyr mutate
+#' @importFrom dplyr semi_join
 #' @importFrom utils setTxtProgressBar txtProgressBar
+#' @importFrom IRanges setTxtProgressBar txtProgressBar
 #'
 #'
 
@@ -371,9 +377,9 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
     CHG.out <- data.table::fread(file2, header=TRUE)
     CHH.out <- data.table::fread(file3, header=TRUE)
 
-    CG.gr <- GRanges(seqnames=CG.out$seqnames, ranges=IRanges(CG.out$start, end=CG.out$end))
-    CHG.gr <- GRanges(seqnames=CHG.out$seqnames, ranges=IRanges(CHG.out$start, end=CHG.out$end))
-    CHH.gr <- GRanges(seqnames=CHH.out$seqnames, ranges=IRanges(CHH.out$start, end=CHH.out$end))
+    CG.gr <- GenomicRanges::GRanges(seqnames=CG.out$seqnames, ranges=IRanges(CG.out$start, end=CG.out$end))
+    CHG.gr <- GenomicRanges::GRanges(seqnames=CHG.out$seqnames, ranges=IRanges(CHG.out$start, end=CHG.out$end))
+    CHH.gr <- GenomicRanges::GRanges(seqnames=CHH.out$seqnames, ranges=IRanges(CHH.out$start, end=CHH.out$end))
 
     #CG.only
     message("Generating CG-only DMRs...")
@@ -416,7 +422,7 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
     nonCG.collect <- list()
     overlaps.nonCG <- GenomicRanges::findOverlaps(CHG.gr, CHH.gr, ignore.strand=TRUE)
     overlaps.hits.nonCG <- IRanges::subsetByOverlaps(CHG.gr, CHH.gr)
-    mcols(overlaps.hits.nonCG)$DMRs.CHH.coord<- CharacterList(split(CHH.gr[subjectHits(overlaps.nonCG)], queryHits(overlaps.nonCG)))
+    mcols(overlaps.hits.nonCG)$DMRs.CHH.coord<- IRanges::CharacterList(split(CHH.gr[subjectHits(overlaps.nonCG)], queryHits(overlaps.nonCG)))
     out.nonCG <- IRanges::subsetByOverlaps(overlaps.hits.nonCG, CG.gr, invert = TRUE)
     nonCG <- data.frame(out.nonCG) %>% dplyr::mutate(DMRs.CHH.coord = strsplit(as.character(DMRs.CHH.coord), ",")) %>% tidyr::unnest(c(DMRs.CHH.coord))
     nonCG.clean <- data.frame(lapply(nonCG, function(k) gsub ("[\\c]|[()]|\"|^ .", "", k)))
@@ -430,8 +436,8 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
 
     for (i1 in 1:NROW(nonCG.clean)){
       myrow <- nonCG.clean[i1,]
-      a=makeGRangesFromDataFrame(myrow[,c("CHG.seqnames","CHG.start","CHG.stop")])
-      b=makeGRangesFromDataFrame(myrow[,c("CHH.seqnames","CHH.start","CHH.stop")])
+      a=GenomicRanges::makeGRangesFromDataFrame(myrow[,c("CHG.seqnames","CHG.start","CHG.stop")])
+      b=GenomicRanges::makeGRangesFromDataFrame(myrow[,c("CHH.seqnames","CHH.start","CHH.stop")])
       out <- data.frame(GenomicRanges::intersect(a,b))
       myrow$merged.seqnames <- out$seqnames
       myrow$merged.start <- out$start
@@ -451,11 +457,11 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
     multi.context.collect <- list()
     overlaps.1 <- GenomicRanges::findOverlaps(CG.gr, CHG.gr, ignore.strand=TRUE)
     overlaps.hits.1 <- IRanges::subsetByOverlaps(CG.gr, CHG.gr)
-    mcols(overlaps.hits.1)$DMRs.CHG.coord <- CharacterList(split(CHG.gr[subjectHits(overlaps.1)], queryHits(overlaps.1)))
+    mcols(overlaps.hits.1)$DMRs.CHG.coord <- IRanges::CharacterList(split(CHG.gr[subjectHits(overlaps.1)], queryHits(overlaps.1)))
     overlaps.2 <- GenomicRanges::findOverlaps(overlaps.hits.1, CHH.gr, ignore.strand=TRUE)
     overlaps.hits.2 <- IRanges::subsetByOverlaps(overlaps.hits.1, CHH.gr)
     if (NROW(overlaps.hits.2)!=0){
-      mcols(overlaps.hits.2)$DMRs.CHH.coord <- CharacterList(split(CHH.gr[subjectHits(overlaps.2)], queryHits(overlaps.2)))
+      mcols(overlaps.hits.2)$DMRs.CHH.coord <- IRanges::CharacterList(split(CHH.gr[subjectHits(overlaps.2)], queryHits(overlaps.2)))
       multi.context.1 <- data.frame(overlaps.hits.2) %>% dplyr::mutate(DMRs.CHG.coord = strsplit(as.character(DMRs.CHG.coord), ",")) %>% tidyr::unnest(c(DMRs.CHG.coord))
       multi.context.1.clean <- data.frame(lapply(multi.context.1, function(k) gsub ("[\\c]|[()]|\"|^ .", "", k)))
       multi.context.1.clean <- multi.context.1.clean %>% tidyr::separate(DMRs.CHG.coord, c("CHG.seqnames","CHG.start","CHG.stop"), sep = '([-:])')
@@ -470,9 +476,9 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
 
       for (i2 in 1:NROW(multi.context.2.clean)){
         myrow.x <- multi.context.2.clean[i2,]
-        a=makeGRangesFromDataFrame(myrow.x[,c("CG.seqnames","CG.start","CG.stop")])
-        b=makeGRangesFromDataFrame(myrow.x[,c("CHG.seqnames","CHG.start","CHG.stop")])
-        c=makeGRangesFromDataFrame(myrow.x[,c("CHH.seqnames","CHH.start","CHH.stop")])
+        a=GenomicRanges::makeGRangesFromDataFrame(myrow.x[,c("CG.seqnames","CG.start","CG.stop")])
+        b=GenomicRanges::makeGRangesFromDataFrame(myrow.x[,c("CHG.seqnames","CHG.start","CHG.stop")])
+        c=GenomicRanges::makeGRangesFromDataFrame(myrow.x[,c("CHH.seqnames","CHH.start","CHH.stop")])
         out1 <- GenomicRanges::intersect(a,b)
         out2 <- data.frame(GenomicRanges::intersect(out1,c))
         if (NROW(out2)!=0){
