@@ -119,57 +119,59 @@ annotateDMRs <- function(annotation, gff.files, gff3.out, input.dir, out.dir) {
 
     cat(paste0("Running file ", file.list[i], "\n"), sep = "")
     tmp.name <- gsub("\\.txt$", "", basename(file.list[i]))
-    file <- fread(file.list[i], skip=1, select=c(1,2,3))
-    gr <- GRanges(seqnames=file$V1, ranges=IRanges(start=file$V2, end=file$V3))
-    gff <- gff3.in(gff.files)
+    file <- fread(file.list[i], select=c(1,2,3))
+    if (nrow(file) != 0) {
+      colnames(file) <- c('V1','V2','V3')
+      gr <- GRanges(seqnames=file$V1, ranges=IRanges(start=file$V2, end=file$V3))
+      gff <- gff3.in(gff.files)
 
-    if (gff3.out==TRUE) {
-      gff3.out(annotation=annotation,
-               gff=gff,
-               grangesObj=gr,
-               name=tmp.name,
-               out.dir=out.dir)
-    }
-
-    d <- rbindlist(annotate(getAnno=annotation, mygff=gff, mygr=gr))
-    if (nrow(d) != 0){
-      out <- d %>%
-        dplyr::group_by(seqnames, start, end) %>%
-        dplyr::summarize(
-          type = paste(type, collapse=","),
-          id = paste(id, collapse=","),
-          Annotation.coord = paste(Annotation.coord, collapse=",")
-          #, .groups = 'drop'
+      if (gff3.out==TRUE) {
+        gff3.out(annotation=annotation,
+                 gff=gff,
+                 grangesObj=gr,
+                 name=tmp.name,
+                 out.dir=out.dir)
+      }
+      d <- rbindlist(annotate(getAnno=annotation, mygff=gff, mygr=gr))
+      if (nrow(d) != 0){
+        out <- d %>%
+          dplyr::group_by(seqnames, start, end) %>%
+          dplyr::summarize(
+            type = paste(type, collapse=","),
+            id = paste(id, collapse=","),
+            Annotation.coord = paste(Annotation.coord, collapse=",")
+            #, .groups = 'drop'
           ) %>% as.data.frame()
 
-      if (NROW(out)!=0){
-        for (k1 in 1:NROW(out)){
-          out$unique.anno.type[k1] <- paste0(sapply(strsplit(out$type[k1],","),unique), collapse=",")
+        if (NROW(out)!=0){
+          for (k1 in 1:NROW(out)){
+            out$unique.anno.type[k1] <- paste0(sapply(strsplit(out$type[k1],","),unique), collapse=",")
+          }
         }
+        # count the DMR overlaps; the output can be used to make a barplot or pie-chart
+        # unique annotation overlaps
+
+        out.1 <- out[which(sapply(strsplit(out$type,','), uniqueN)==1),]
+        out.2 <- out[which(sapply(strsplit(out$type,','), uniqueN)>=2),]
+
+        #counting unique annotations
+        for (k2 in seq_along(annotation)){
+          anno.list[[k2]] <- NROW(out.1[grep(annotation[k2], out.1$type),])
+          names(anno.list)[[k2]] <- annotation[k2]
+        }
+        #also counting multiple overlaps
+        anno.list[length(annotation)+1] <- list(NROW(out.2))
+        names(anno.list)[[length(annotation)+1]] <- "multiple.overlaps"
+        df.1 <- do.call(cbind, anno.list)
+
+        df <- cbind(sample=tmp.name, total.DMRs=NROW(gr), df.1)
+        final.df <- rbind(final.df, data.frame(df))
+
+        out <- out[,-c(4,6)]
+        fwrite(x=out, file=paste0(out.dir, "/", tmp.name, "_annotation.txt"), quote=FALSE, row.names=FALSE, col.names=TRUE, sep="\t")
       }
-      # count the DMR overlaps; the output can be used to make a barplot or pie-chart
-      # unique annotation overlaps
-
-      out.1 <- out[which(sapply(strsplit(out$type,','), uniqueN)==1),]
-      out.2 <- out[which(sapply(strsplit(out$type,','), uniqueN)>=2),]
-
-      #counting unique annotations
-      for (k2 in seq_along(annotation)){
-        anno.list[[k2]] <- NROW(out.1[grep(annotation[k2], out.1$type),])
-        names(anno.list)[[k2]] <- annotation[k2]
-      }
-      #also counting multiple overlaps
-      anno.list[length(annotation)+1] <- list(NROW(out.2))
-      names(anno.list)[[length(annotation)+1]] <- "multiple.overlaps"
-      df.1 <- do.call(cbind, anno.list)
-
-      df <- cbind(sample=tmp.name, total.DMRs=NROW(gr), df.1)
-      final.df <- rbind(final.df, data.frame(df))
-
-      out <- out[,-c(4,6)]
-      fwrite(x=out, file=paste0(out.dir, "/", tmp.name, "_annotation.txt"), quote=FALSE, row.names=FALSE, col.names=TRUE, sep="\t")
+      fwrite(x=final.df, file=paste0(out.dir, "/DMR-counts.txt"), quote=FALSE, row.names=FALSE, col.names=TRUE, sep="\t")
     }
-    fwrite(x=final.df, file=paste0(out.dir, "/DMR-counts.txt"), quote=FALSE, row.names=FALSE, col.names=TRUE, sep="\t")
   }
 }
 
