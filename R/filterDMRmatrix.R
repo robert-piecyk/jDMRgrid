@@ -259,7 +259,7 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
     for (i in seq_along(list.status)){
       # extract context for a given state calls file
       context <- gsub("_StateCalls.txt", "", basename(list.status[i]))
-      message("Filtering DMR matrix for ", context, ' context.')
+      message("\nFiltering DMR matrix for ", context, ' context.')
 
       # read a given state calls file
       if (file.exists(list.status[i])){
@@ -406,7 +406,7 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
     DMR.list.out(context.df=CG.only,
                  out.name=paste0(tmp.name,"CG-only-DMRs"),
                  data.out=data.dir)
-    message("Done!")
+    message("Done!\n")
 
     #CHG.only
     message("Generating CHG-only DMRs...")
@@ -418,7 +418,7 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
     DMR.list.out(context.df=CHG.only,
                  out.name=paste0(tmp.name,"CHG-only-DMRs"),
                  data.out=data.dir)
-    message("Done!")
+    message("Done!\n")
 
     #CHH.only
     message("Generating CHH-only DMRs...")
@@ -430,7 +430,7 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
     DMR.list.out(context.df=CHH.only,
                  out.name=paste0(tmp.name, "CHH-only-DMRs"),
                  data.out=data.dir)
-    message("Done!")
+    message("Done!\n")
 
     #non-CG
     message("Generating non-CG DMRs...")
@@ -465,7 +465,7 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
     DMR.list.out(context.df=data.table::rbindlist(nonCG.collect),
                  out.name=paste0(tmp.name,"nonCG-DMRs"),
                  data.out=data.dir)
-    message("Done!")
+    message("Done!\n")
 
     #multi-context
     message("Generating multi-context DMRs...")
@@ -495,13 +495,13 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir){
       multi.context.collect$merged.seqnames <- out2$seqnames
       multi.context.collect$merged.start <- out2$start
       multi.context.collect$merged.stop <- out2$end
-      DMR.list.out(context.df=f,
+      DMR.list.out(context.df=multi.context.collect,
                    out.name=paste0(tmp.name, "multi-context-DMRs"),
                    data.out=data.dir)
     } else {
       message("No multi-context DMRs found!")
     }
-    message("Done!")
+    message("Done!\n")
   } else {
     stop("Filtered DMR matrix files for all contexts donot exist!")
   }
