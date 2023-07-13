@@ -138,11 +138,11 @@ runjDMRgrid <- function(out.dir,
   merge.list <- vector(mode="list")
   filelist <- data.table::fread(samplefiles, header=TRUE)
 
-  lapply(seq_along(bin.select), function(j) {
+  info_lapply <- lapply(seq_along(bin.select), function(j) {
     refRegion <- dget(bin.select[[j]][[1]])
     refRegion <- list(reg.obs = refRegion)
 
-    info <- sapply(seq_along(filelist$file), function(i) {
+    info_vapply <- vapply(seq_along(filelist$file), function(i) {
       methfn <- gsub(".*methylome_|\\.txt|_All.txt$", "", filelist$file[i])
       message("Running file: ", methfn, " for context: ", names(bin.select)[j], "\n")
       fileName <- basename(methfn)
@@ -158,6 +158,6 @@ runjDMRgrid <- function(out.dir,
         name = fileName,
         mincov = mincov
       )
-    })
+    }, FUN.VALUE=NULL)
   })
 }
