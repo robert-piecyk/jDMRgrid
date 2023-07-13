@@ -1,13 +1,14 @@
+#'
 #' @param gff
-#' @importFrom ape read.gff
+#' @importFrom  rtracklayer import.gff3
 #' @export
 #' @return merge all supplied gff3 annotations into one
 #merge the input gff3 files into one
 gff3.in <- function(gff){
   input.gff <- lapply(gff, function(x){
-    read.gff(x)
+    import.gff3(x, colnames=c("type", "ID"))
   })
-  merged.gff <- rbindlist(input.gff)
+  merged.gff <- do.call(c, input.gff)
   return(merged.gff)
 }
 
@@ -25,6 +26,7 @@ gff3.in <- function(gff){
 #' @param out.dir output directory
 #' @importFrom GenomicRanges findOverlaps
 #' @importFrom  rtracklayer export.gff
+#' @export
 #' @export
 #' @return export output files in gff3 format
 #output annotated gff3 files
@@ -57,11 +59,11 @@ gff3.out <- function(annotation, grangesObj, gff, name, out.dir) {
 #' @param gff.files
 #' @param gff3.out
 #' @param input.dir
+#' @import magrittr
+#' @importFrom dplyr mutate
 #' @importFrom GenomicRanges findOverlaps
 #' @importFrom GenomicRanges subsetByOverlaps
 #' @importFrom IRanges CharacterList
-#' @importFrom ape read.gff
-#' @import dplyr
 #' @export
 #' @return annotated list
 #extract annotated regions
@@ -78,7 +80,7 @@ annotate <- function(getAnno, mygff, mygr){
     mcols(myranges)$coord <- CharacterList(split(ranges(mygff)[subjectHits(hits)], queryHits(hits)))
     mcols(myranges)$anno.str <- CharacterList(split(strand(mygff)[subjectHits(hits)], queryHits(hits)))
     df <- as(myranges, "data.frame")
-    df <- df %>% mutate(id = strsplit(as.character(id), ","),
+    df <- df %>% dplyr::mutate(id = strsplit(as.character(id), ","),
                         type = strsplit(as.character(type), ","),
                         chr = strsplit(as.character(chr), ","),
                         coord = strsplit(as.character(coord), ","),
@@ -121,10 +123,11 @@ annotateDMRs <- function(annotation, gff.files, gff3.out, input.dir, out.dir) {
     cat(paste0("Running file ", file.list[i], "\n"), sep = "")
     tmp.name <- gsub("\\.txt$", "", basename(file.list[i]))
     file <- fread(file.list[i], select=c(1,2,3))
-    if (nrow(file) != 0) {
+    if (NROW(file) != 0)
+    {
       colnames(file) <- c('V1','V2','V3')
       gr <- GRanges(seqnames=file$V1, ranges=IRanges(start=file$V2, end=file$V3))
-      gff <- gff3.in(gff.files)
+      gff=gff3.in(gff.files)
 
       if (gff3.out==TRUE) {
         gff3.out(annotation=annotation,
@@ -133,6 +136,7 @@ annotateDMRs <- function(annotation, gff.files, gff3.out, input.dir, out.dir) {
                  name=tmp.name,
                  out.dir=out.dir)
       }
+
       d <- rbindlist(annotate(getAnno=annotation, mygff=gff, mygr=gr))
       if (nrow(d) != 0){
         out <- d %>%
@@ -175,4 +179,3 @@ annotateDMRs <- function(annotation, gff.files, gff3.out, input.dir, out.dir) {
     }
   }
 }
-
