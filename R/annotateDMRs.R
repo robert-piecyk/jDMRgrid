@@ -1,14 +1,13 @@
-#'
 #' @param gff
-#' @importFrom  rtracklayer import.gff3
+#' @importFrom ape read.gff
 #' @export
 #' @return merge all supplied gff3 annotations into one
 #merge the input gff3 files into one
 gff3.in <- function(gff){
   input.gff <- lapply(gff, function(x){
-    import.gff3(x, colnames=c("type", "ID"))
+    read.gff(x)
   })
-  merged.gff <- do.call(c, input.gff)
+  merged.gff <- rbindlist(input.gff)
   return(merged.gff)
 }
 
@@ -122,7 +121,7 @@ annotateDMRs <- function(annotation, gff.files, gff3.out, input.dir, out.dir) {
     tmp.name <- gsub("\\.txt$", "", basename(file.list[i]))
     file <- fread(file.list[i], skip=1, select=c(1,2,3))
     gr <- GRanges(seqnames=file$V1, ranges=IRanges(start=file$V2, end=file$V3))
-    gff=gff3.in(gff.files)
+    gff <- gff3.in(gff.files)
 
     if (gff3.out==TRUE) {
       gff3.out(annotation=annotation,

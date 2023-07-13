@@ -54,18 +54,19 @@ filterReplicateConsensus <- function(status.collect, rc.methlevel.collect, repli
           df.bind_rows$mypattern <- as.numeric(df.bind_rows$mypattern)
           df.bind_rows$diff.count <- as.numeric(df.bind_rows$diff.count)
           df.bind_rows$count <- as.numeric(df.bind_rows$count)
+          df.bind <- df.bind_rows
         }
       }
       Sys.sleep(1/NROW(status.collect))
       setTxtProgressBar(pb1, x)
       close(pb1)
 
-      df.gp <- group_by(df.bind_rows, sample) %>% dplyr::summarize(n = mean(diff.count))
+      df.gp <- group_by(df.bind, sample) %>% dplyr::summarize(n = mean(diff.count))
       cb <- combn(df.gp$n,2)
       my.diff <- unlist(lapply(cb, function(x) abs(cb[1]-cb[2])))
 
       # allowing 50% difference between control and treatment groups
-      if ((min(my.diff) >= diff.ct) & (sum(df.bind_rows$count)==0)) {
+      if ((min(my.diff) >= diff.ct) & (sum(df.bind$count)==0)) {
         dt <- rbind(dt, status.collect[x,])
       }
       #print(df.bind)
