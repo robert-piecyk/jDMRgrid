@@ -1,6 +1,6 @@
-file	sample
-toyData/methimpute_p1.csv methylomeA
-toyData/methimpute_p2.csv	methylomeB
-toyData/methimpute_p3.csv	methylomeC
-toyData/methimpute_p4.csv	methylomeD
-toyData/methimpute_p5.csv	methylomeE
+file  sample  replicate
+toyData/methimpute_p1.csv methylomeA  rep1
+toyData/methimpute_p2.csv methylomeB  rep1
+toyData/methimpute_p3.csv methylomeC  rep1
+toyData/methimpute_p4.csv methylomeD  rep1
+toyData/methimpute_p5.csv methylomeE  rep1
