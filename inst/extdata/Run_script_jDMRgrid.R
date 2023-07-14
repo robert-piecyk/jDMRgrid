@@ -54,9 +54,9 @@ makeDMRmatrix(contexts = c("CG", "CHG", "CHH"),
 # Refer to section 1.2 in the manual. The metadata file requires an additional column
 # "group"
 #-------------------------------------------------------------------------------
-split.groups(samplefiles=system.file("extdata", "listFiles2.fn", package="jDMRgrid"),
-             input.dir="folder_replicate/matrix",
-             out.dir="folder_replicate/matrix")
+split.groups(samplefiles = system.file("extdata", "listFiles2.fn", package="jDMRgrid"),
+             input.dir = "folder_replicate/matrix",
+             out.dir = "folder_replicate/matrix")
 
 #-------------------------------------------------------------------------------
 # Step 3: Filter the DMR matrix
@@ -74,13 +74,13 @@ filterDMRmatrix(epiMAF.cutoff = NULL,
 #-------------------------------------------------------------------------------
 # Step 4: Generate context-specific DMRs
 #-------------------------------------------------------------------------------
-context.specific.DMRs(samplefiles=system.file("extdata", "listFiles1.fn", package="jDMRgrid"),
-                      output.dir="folder_population/context_DMRs",
-                      input.dir="folder_population/matrix")
+context.specific.DMRs(samplefiles = system.file("extdata", "listFiles1.fn", package="jDMRgrid"),
+                      output.dir = "folder_population/context_DMRs",
+                      input.dir = "folder_population/matrix")
 
-context.specific.DMRs(samplefiles=system.file("extdata", "listFiles2.fn", package="jDMRgrid"),
-                      output.dir="folder_replicate/context_DMRs",
-                      input.dir="folder_replicate/matrix")
+context.specific.DMRs(samplefiles = system.file("extdata", "listFiles2.fn", package="jDMRgrid"),
+                      output.dir = "folder_replicate/context_DMRs",
+                      input.dir = "folder_replicate/matrix")
 
 #-------------------------------------------------------------------------------
 # Step 5: Annotate DMRs. Please create a new folder and move all files to be annotated
@@ -92,13 +92,13 @@ gff.file_promoters <- "../jDMRgrid/jDMRgrid/toyData/TAIR10_promoters.gff3"
 gff.file_TE <- "../jDMRgrid/jDMRgrid/toyData/TAIR10_TE.gff3"
 gff.file_genes <- "../jDMRgrid/jDMRgrid/toyData/TAIR10.gene.chr1.gff3"
 
-annotateDMRs(gff.files=c(gff.file_promoters, gff.file_TE, gff.file_genes),
-             annotation=c("promoters", "TE", "gene"), #string containing annotation types
-             input.dir="folder_population/context_DMRs",
-             gff3.out=FALSE,
-             out.dir=data.dir.pop)
-annotateDMRs(gff.files=c(gff.file_promoters, gff.file_TE, gff.file_genes),
-             annotation=c("promoters", "TE", "gene"), #string containing annotation types
-             input.dir="folder_replicate/context_DMRs",
-             gff3.out=FALSE,
-             out.dir=data.dir.rep)
+annotateDMRs(gff.files = c(gff.file_promoters, gff.file_TE, gff.file_genes),
+             annotation = c("promoters", "TE", "gene"), #string containing annotation types
+             input.dir = "folder_population/context_DMRs",
+             gff3.out = FALSE,
+             out.dir = data.dir.pop)
+annotateDMRs(gff.files = c(gff.file_promoters, gff.file_TE, gff.file_genes),
+             annotation = c("promoters", "TE", "gene"), #string containing annotation types
+             input.dir = "folder_replicate/context_DMRs",
+             gff3.out = FALSE,
+             out.dir = data.dir.rep)
