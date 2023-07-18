@@ -228,7 +228,8 @@ export.out <- function(out.rcmethlvl, out.statecalls, context, out.name1, out.na
 filterDMRmatrix <- function(epiMAF.cutoff=NULL,
                             replicate.consensus=NULL,
                             data.dir,
-                            samplefiles) {
+                            samplefiles,
+                            mergingBins=TRUE) {
 
   contexts <- unique(sub("_.*", "", list.files(data.dir, pattern = 'C')))
   ft <- data.table::fread(samplefiles)
@@ -288,7 +289,12 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
         message("Both, epiMAF and replicate consensus set to NULL. Merge corresponding bins")
         out1 <- status.collect
         out2 <- rc.methlevel.collect
-        out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+        if (mergingBins == TRUE)
+        {
+          out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+        } else {
+          out <- list(statecalls=out1, rcmethlvl=out2)
+        }
         export.out(out.statecalls=out[[1]],
                    out.rcmethlvl=out[[2]],
                    context=context,
@@ -305,7 +311,12 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
           # for population data remove the epiMAF column
           out1 <- mydf[[1]][,-c("epiMAF")]
           out2 <- mydf[[2]]
-          out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+          if (mergingBins == TRUE)
+          {
+            out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+          } else {
+            out <- list(statecalls=out1, rcmethlvl=out2)
+          }
           export.out(out.statecalls=out[[1]],
                      out.rcmethlvl=out[[2]],
                      context=context,
@@ -316,7 +327,12 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
           message('Filtering for epiMAF returns NULL dataset. Proceeding with the original dataset...')
           out1 <- status.collect
           out2 <- rc.methlevel.collect
-          out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+          if (mergingBins == TRUE)
+          {
+            out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+          } else {
+            out <- list(statecalls=out1, rcmethlvl=out2)
+          }
           export.out(out.statecalls=out[[1]],
                      out.rcmethlvl=out[[2]],
                      context=context,
@@ -332,7 +348,12 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
         if (!is.null(mydf)){
           out1 <- mydf[[1]]
           out2 <- mydf[[2]]
-          out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+          if (mergingBins == TRUE)
+          {
+            out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+          } else {
+            out <- list(statecalls=out1, rcmethlvl=out2)
+          }
           export.out(out.statecalls=out[[1]],
                      out.rcmethlvl=out[[2]],
                      context=context,
@@ -343,7 +364,12 @@ filterDMRmatrix <- function(epiMAF.cutoff=NULL,
           message('Filtering for replicate consensus returns NULL dataset. Proceeding with the original dataset...')
           out1 <- status.collect
           out2 <- rc.methlevel.collect
-          out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+          if (mergingBins == TRUE)
+          {
+            out <- merge.bins(statecalls=out1, rcmethlvl=out2)
+          } else {
+            out <- list(statecalls=out1, rcmethlvl=out2)
+          }
           export.out(out.statecalls=out[[1]],
                      out.rcmethlvl=out[[2]],
                      context=context,

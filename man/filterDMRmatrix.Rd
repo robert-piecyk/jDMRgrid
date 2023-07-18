@@ -9,6 +9,7 @@ filterDMRmatrix(
   replicate.consensus = NULL,
   data.dir,
   samplefiles
+  mergingBins = TRUE
 )
 }
 \arguments{
@@ -19,6 +20,8 @@ filterDMRmatrix(
 \item{data.dir}{Path to the directory containing DMR matrix files. Looks for files with suffix("_StateCalls.txt" and "_rcMethlvl.txt"). (character)}
 
 \item{samplefiles}{Path to the text file containing path to samples and sample names. For control/treatment data an additional column specifying the replicates is required. (character)}
+
+\item{mergingBins}{Logical argument if merging consecutive bins having the same stateCalls should be performed. (logical)}
 }
 \description{
 Filters non-polymorphic patterns by default.
