@@ -118,6 +118,10 @@ This function uses a grid approach to bin the genome into equal sized bins. User
 
 **runName**: CHARACTER as the name of the operation. By default this option is set to 'GridGenome'.
 
+**parallelApply**: LOGICAL specifying if future.apply package should be used to use parallel operation. By default this option is set to FALSE.
+
+**numCores**: NUMERIC VALUE specifying number of cores to perform parallel operation using foreach loop. By default this option is set to NULL.
+
 
 \setlength{\leftskip}{0pt}
 
@@ -136,7 +140,9 @@ runjDMRgrid(out.dir = paste0(out.dir.pop, '/grid'),
             min.C = 10,
             mincov = 0,
             include.intermediate = FALSE,
-            runName = "Arabidopsis")
+            runName = "Arabidopsis",
+            parallelApply = FALSE, #set to TRUE if you want to run using parallel future.apply
+            numCores = NULL) #set to numeric value of coures if you want to run using parallel foreach loop
 
 runjDMRgrid(out.dir = paste0(out.dir.rep, '/grid'),
             window = 200,
@@ -146,7 +152,9 @@ runjDMRgrid(out.dir = paste0(out.dir.rep, '/grid'),
             min.C = 10,
             mincov = 0,
             include.intermediate = TRUE, #if you want to include intermediate calls as well
-            runName = "Arabidopsis")
+            runName = "Arabidopsis",
+            parallelApply = FALSE, #set to TRUE if you want to run using parallel future.apply
+            numCores = NULL) #set to numeric value of coures if you want to run using parallel foreach loop
 ```
 
 ### Output files of jDMR Grid approach
@@ -276,6 +284,8 @@ This function filters the DMR matrix for non-polymorphic patterns.
 
 **samplefiles** : Path to the text file containing path to samples and sample names. For control/treatment data an additional column specifying the replicates is required.
 
+**mergingBins** : Logical argument if merging consecutive bins having the same stateCalls should be performed. By default set to TRUE. (logical)
+
 \setlength{\leftskip}{0pt}
                             
 ```{r eval=FALSE, include=TRUE}
@@ -283,12 +293,14 @@ This function filters the DMR matrix for non-polymorphic patterns.
 filterDMRmatrix(epiMAF.cutoff = 0.33,
                 replicate.consensus = NULL,
                 data.dir = paste0(out.dir.pop, "/matrix"),
-                samplefiles = system.file("extdata", "listFiles1.fn", package="jDMRgrid"))
+                samplefiles = system.file("extdata", "listFiles1.fn", package="jDMRgrid"),
+                mergingBins = FALSE)
 
 filterDMRmatrix(epiMAF.cutoff = NULL,
                 replicate.consensus = 0.8,
                 data.dir = paste0(out.dir.rep, "/matrix"),
-                samplefiles = system.file("extdata", "listFiles2.fn", package="jDMRgrid"))
+                samplefiles = system.file("extdata", "listFiles2.fn", package="jDMRgrid"),
+                mergingBins = FALSE)
 
 
 ```

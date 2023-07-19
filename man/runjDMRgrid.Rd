@@ -13,7 +13,9 @@ runjDMRgrid(
   min.C,
   mincov = 0,
   include.intermediate = FALSE,
-  runName = "GridGenome"
+  runName = "GridGenome",
+  numCores = NULL,
+  parallelApply = FALSE
 )
 }
 \arguments{

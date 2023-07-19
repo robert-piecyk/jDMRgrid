@@ -65,7 +65,8 @@ binGenome <- function(methimputefiles,
         # Counting cytosines in GRanges
         dat.collect <- GenomicRanges::countOverlaps(data_gr, ref_gr)
         # Create a empirical distribution of cytosines within bins and find a threshold based on its min.C percentile
-        new.dat.collect <- dat.collect[which(dat.collect >= min.C)]
+        #new.dat.collect <- dat.collect[which(dat.collect >= min.C)]
+        new.dat.collect <- dat.collect[(which(dat.collect >= as.numeric(quantile(ecdf(dat.collect), min.C/100))))]
         non.empty.bins <- length(new.dat.collect) / length(dat.collect)
         # Create a filtrated data frame
         data.out <- dd[which(dat.collect >= min.C),]
