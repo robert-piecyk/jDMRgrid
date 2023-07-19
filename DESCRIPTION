@@ -29,6 +29,6 @@ Imports:
     minpack.lm (>= 1.2),
     S4Vectors (>= 0.24),
     stats (>= 3.6.3)
-    future.apply (>= 1.10.1)
-    doParallel (>= 1.0.0)
+    future.apply
+    doParallel
 RoxygenNote: 7.2.3
