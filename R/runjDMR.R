@@ -1,10 +1,12 @@
-export.bins <- function(mylist, myinfo, out.dir, runName)
+export.bins <- function(mylist, out.dir, runName)
 {
-  lapply(seq_along(myinfo$bin.size), function(z1) {
-    window.size.1 <- myinfo$bin.size[z1]
-    step.size.1 <- myinfo$step.size[z1]
-    mylist.1 <- mylist[[as.character(window.size.1)]]
-    context.1 <- myinfo$context[z1]
+  names_mylist <- names(mylist)
+  lapply(seq_along(names_mylist), function(z1) {
+    names_mylist.1 <- names_mylist[z1]
+    window.size.1 <- strsplit(names_mylist.1, '_')[[1]][[2]]
+    step.size.1 <- strsplit(names_mylist.1, '_')[[1]][[3]]
+    mylist.1 <- mylist[[z1]]
+    context.1 <- strsplit(names_mylist.1, '_')[[1]][[1]]
     out.name.1 <- paste0(out.dir, "/",runName,"_Win", window.size.1,"_Step", step.size.1,"_",context.1,".Rdata",sep="")
     dput(mylist.1, out.name.1)
   })
@@ -16,7 +18,7 @@ binGenome <- function(methimputefiles,
                       min.C,
                       out.dir,
                       runName)
-  {
+{
   # message about creating grid
   message('Creating grid...')
   cyt.collect <- list()
@@ -63,28 +65,29 @@ binGenome <- function(methimputefiles,
         # Counting cytosines in GRanges
         dat.collect <- GenomicRanges::countOverlaps(data_gr, ref_gr)
         # Create a empirical distribution of cytosines within bins and find a threshold based on its min.C percentile
-        new.dat.collect <- dat.collect[(which(dat.collect >= as.numeric(quantile(ecdf(dat.collect), min.C/100))))]
+        new.dat.collect <- dat.collect[which(dat.collect >= min.C)]
         non.empty.bins <- length(new.dat.collect) / length(dat.collect)
-        return(non.empty.bins)
+        # Create a filtrated data frame
+        data.out <- dd[which(dat.collect >= min.C),]
+        return(list(non.empty.bins, data.out))
       })
-
+      new.one <- lapply(results, function(x) x[[2]])
+      names(new.one) <- paste0(contexts, '_', window.size, '_', step.size)
       # Add the results to the mydf data frame
       mydf <- cbind(mydf, data.frame(context = contexts,
-                                     ratio = unlist(results)))
-      return(list(mydf = mydf, collect.bins = new))
+                                     ratio = unlist(lapply(results, function(x) x[[1]]))))
+      return(list(mydf = mydf, collect.bins = new.one))
     })
     out <- data.table::rbindlist(lapply(results, function(x) x$mydf))
-    out <- out[order(out$bin.size, out$step.size),]
-    out <- split(out, f = out$context)
-    mybins <- out
-    data.table::fwrite(data.table::rbindlist(out), file = paste0(out.dir, '/', runName, '_optimal_minC_threshold.csv'))
+    out <- out[order(out$context, out$bin.size, out$step.size),]
+    data.table::fwrite(out, file = paste0(out.dir, '/', runName, '_optimal_minC_threshold.csv'))
+    mybins <- split(out, f=out$context)
     #mybins <- lapply(out, function(x) x[which.min(x$ratio),]) #deleted selection of the min ratio per context
     collect.bins <- lapply(results, function(x) x$collect.bins)
     message("Exporting regions...")
-    lapply(mybins, function(x) export.bins(mylist=collect.bins[[1]],
-                                           myinfo=x,
-                                           out.dir=out.dir,
-                                           runName=runName))
+    lapply(collect.bins, function(x) export.bins(mylist=x,
+                                                 out.dir=out.dir,
+                                                 runName=runName))
     return(list.files(out.dir, pattern=paste0(".*", runName, ".*\\.Rdata$"), full.names=TRUE))
   }
   message("Done!")
@@ -94,15 +97,18 @@ binGenome <- function(methimputefiles,
 #'
 #' this function runs a HMM model on a genome binned using a sliding/non-sliding window approach
 #' @param out.dir Output directory. (character)
-#' @param window Bin size. (numeric vector)
-#' @param step Step size. (numeric vector)
+#' @param window Bin size. (numeric)
+#' @param step Step size. (numeric)
 #' @param samplefiles Path to the text file containing path to samples and sample names. For control/treatment data an additional column specifying the replicates is required. (character)
 #' @param contexts Vector of cytosine contexts selected for DMR calling. By default this option is set for all 3 cytosine contexts CG, CHG and CHH. (character vector)
 #' @param min.C Percentile threshold based on empirical distribution of the cytosines across bins. (numeric value between 0 and 100)
 #' @param mincov Minimum read coverage over cytosines. By default this option is set as 0. (numeric value between 0 and 1)
 #' @param include.intermediate A logical specifying whether or not the intermediate component should be included in the HMM model. By default this option is set as FALSE. (logical)
-#' @param runName Name of the operation. By default this option is set to 'GridGenome'. (character)
+#' @param numCores Number of cores to perform parallel operation using foreach loop. Default to NULL. (numeric)
+#' @param parallelApply A logical specifying if futureapply method should be performed to use parallel operation. Default to FALSE. (logical)
 #' @import magrittr
+#' @import future.apply
+#' @import doParallel
 #' @importFrom data.table fread fwrite
 #' @importFrom stringr str_remove_all
 #' @importFrom data.table fwrite
@@ -117,8 +123,11 @@ runjDMRgrid <- function(out.dir,
                         min.C,
                         mincov=0,
                         include.intermediate=FALSE,
-                        runName='GridGenome')
-  {
+                        runName='GridGenome',
+                        numCores = NULL,
+                        parallelApply = FALSE)
+{
+  # Step 1: Bin genome according to the window and step size
   bin.genome.files <- binGenome(methimputefiles=data.table::fread(samplefiles)$file,
                                 contexts=contexts,
                                 window=window,
@@ -126,6 +135,7 @@ runjDMRgrid <- function(out.dir,
                                 min.C=min.C,
                                 out.dir=out.dir,
                                 runName=runName)
+  # Step 2: Extract RData for binned regions and name them as contexts
   bin.select <- lapply(seq_along(contexts), function(x) {
     b <- bin.genome.files[grep(contexts[x], bin.genome.files)]
     if (length(b) != 0) {
@@ -134,30 +144,80 @@ runjDMRgrid <- function(out.dir,
     }
   })
   bin.select <- Filter(Negate(is.null), bin.select)
-  names(bin.select) <- unlist(lapply(bin.select, function(x) names(x)))
-  merge.list <- vector(mode="list")
+  names(bin.select) <- unlist(lapply(bin.select, function(x) names(x)[1]))
+  # Step 3: Read all RData binned regions
+  merge.list <- lapply(bin.select, function(x) dget(x))
+  # Step 4: Read names of methImpute files which needs to be binned
   filelist <- data.table::fread(samplefiles, header=TRUE)
-
-  info_lapply <- lapply(seq_along(bin.select), function(j) {
-    refRegion <- dget(bin.select[[j]][[1]])
-    refRegion <- list(reg.obs = refRegion)
-
-    info_sapply <- sapply(seq_along(filelist$file), function(i) {
-      methfn <- gsub(".*methylome_|\\.txt|_All.txt$", "", filelist$file[i])
-      message("Running file: ", methfn, " for context: ", names(bin.select)[j], "\n")
-      fileName <- basename(methfn)
+  # Step 5: Create data frame consisting of: contexts, methImpute files, sample names (from methImpute files) and IDs corresponding to the binned genome
+  out.filelist <- expand.grid(file = filelist$file,
+                              context = contexts)
+  out.filelist <- merge(out.filelist, data.frame(context = names(bin.select),
+                                                 id = seq(1,length(names(bin.select)))))
+  out.filelist$methfn <- unlist(lapply(seq_along(out.filelist$file),
+                                       function(xi) {
+                                         gsub(".*methylome_|\\.txt|_All.txt$", "", out.filelist$file[xi])
+                                       }))
+  # Step 6: Run makeMethimpute for files in out.filelist
+  if (parallelApply == TRUE)
+  {
+    plan(multisession)
+    info_lapply <- future_lapply(seq_along(out.filelist$context), function(j) {
+      refRegion <- list(reg.obs = merge.list[[out.filelist$id[j]]])
+      message("Running file: ", out.filelist$methfn[j], " for context: ", out.filelist$context[j], "\n")
       grid.out <- makeMethimpute(
-        df = filelist$file[i],
-        context = names(bin.select)[j],
+        df = as.character(out.filelist$file[j]),
+        context = out.filelist$context[j],
         refRegion = refRegion,
         fit.plot = FALSE,
         include.intermediate = include.intermediate,
         probability = "constrained",
         out.dir = out.dir,
-        fit.name = paste0(basename(methfn), "_", names(bin.select)[j]),
-        name = fileName,
-        mincov = mincov
-      )
+        fit.name = paste0(basename(out.filelist$methfn[j]), "_", out.filelist$context[j]),
+        name = basename(out.filelist$methfn[j]),
+        mincov = mincov)
     })
-  })
+  }
+  if (is.numeric(numCores) == TRUE)
+  {
+    registerDoParallel(cl <- makeCluster(numCores))
+    runMethimputeJ <- function(j) {
+      refRegion <- list(reg.obs = merge.list[[out.filelist$id[j]]])
+      message("Running file: ", out.filelist$methfn[j], " for context: ", out.filelist$context[j], "\n")
+      grid.out <- makeMethimpute(
+        df = as.character(out.filelist$file[j]),
+        context = out.filelist$context[j],
+        refRegion = refRegion,
+        fit.plot = FALSE,
+        include.intermediate = include.intermediate,
+        probability = "constrained",
+        out.dir = out.dir,
+        fit.name = paste0(basename(out.filelist$methfn[j]), "_", out.filelist$context[j]),
+        name = basename(out.filelist$methfn[j]),
+        mincov = mincov)
+      return(grid.out)
+    }
+    info_lapply <- foreach(j = seq_along(out.filelist$context), .combine = "c", .packages = c('jDMRgrid', 'magrittr', 'methimpute')) %dopar% {
+      runMethimputeJ(j)
+    }
+    stopCluster(cl)
+  }
+  if (is.null(numCores) & parallelApply == FALSE)
+  {
+    info_lapply <- lapply(seq_along(out.filelist$context), function(j) {
+      refRegion <- list(reg.obs = merge.list[[out.filelist$id[j]]])
+      message("Running file: ", out.filelist$methfn[j], " for context: ", out.filelist$context[j], "\n")
+      grid.out <- makeMethimpute(
+        df = as.character(out.filelist$file[j]),
+        context = out.filelist$context[j],
+        refRegion = refRegion,
+        fit.plot = FALSE,
+        include.intermediate = include.intermediate,
+        probability = "constrained",
+        out.dir = out.dir,
+        fit.name = paste0(basename(out.filelist$methfn[j]), "_", out.filelist$context[j]),
+        name = basename(out.filelist$methfn[j]),
+        mincov = mincov)
+    })
+  }
 }

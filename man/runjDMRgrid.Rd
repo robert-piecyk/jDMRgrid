@@ -34,6 +34,10 @@ runjDMRgrid(
 \item{include.intermediate}{A logical specifying whether or not the intermediate component should be included in the HMM model. By default this option is set as FALSE. (logical)}
 
 \item{runName}{Name of the operation. By default this option is set to 'GridGenome'. (character)}
+
+\item{numCores}{Number of cores to perform parallel operation using foreach loop. Default to NULL. (numeric)}
+
+\item{parallelApply}{A logical specifying if futureapply method should be performed to use parallel operation. Default to FALSE. (logical)}
 }
 \description{
 this function runs a HMM model on a genome binned using a sliding/non-sliding window approach
