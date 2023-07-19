@@ -28,7 +28,7 @@ Imports:
     IRanges (>= 2.20.1),
     minpack.lm (>= 1.2),
     S4Vectors (>= 0.24),
-    stats (>= 3.6.3)
-    future.apply
+    stats (>= 3.6.3),
+    future.apply,
     doParallel
 RoxygenNote: 7.2.3
