@@ -110,6 +110,7 @@ binGenome <- function(methimputefiles,
 #' @import magrittr
 #' @import future.apply
 #' @import doParallel
+#' @import future
 #' @importFrom data.table fread fwrite
 #' @importFrom stringr str_remove_all
 #' @importFrom data.table fwrite

@@ -30,5 +30,6 @@ Imports:
     S4Vectors (>= 0.24),
     stats (>= 3.6.3),
     future.apply,
-    doParallel
+    doParallel,
+    future
 RoxygenNote: 7.2.3
