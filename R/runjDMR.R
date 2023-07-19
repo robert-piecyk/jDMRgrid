@@ -111,11 +111,12 @@ binGenome <- function(methimputefiles,
 #' @import future.apply
 #' @import doParallel
 #' @import future
+#' @import foreach
+#' @importFrom foreach %dopar%
 #' @importFrom data.table fread fwrite
 #' @importFrom stringr str_remove_all
 #' @importFrom data.table fwrite
 #' @importFrom IRanges slidingWindows
-#' @importFrom foreach %dopar%
 #' @export
 #'
 runjDMRgrid <- function(out.dir,
