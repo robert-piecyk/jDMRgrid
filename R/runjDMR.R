@@ -69,7 +69,7 @@ binGenome <- function(methimputefiles,
         new.dat.collect <- dat.collect[(which(dat.collect >= as.numeric(quantile(ecdf(dat.collect), min.C/100))))]
         non.empty.bins <- length(new.dat.collect) / length(dat.collect)
         # Create a filtrated data frame
-        data.out <- dd[which(dat.collect >= min.C),]
+        data.out <- dd[which(dat.collect >= as.numeric(quantile(ecdf(dat.collect), min.C/100))),]
         return(list(non.empty.bins, data.out))
       })
       new.one <- lapply(results, function(x) x[[2]])
