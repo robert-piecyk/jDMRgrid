@@ -184,7 +184,7 @@ runjDMRgrid <- function(out.dir,
   }
   if (is.numeric(numCores) == TRUE)
   {
-    registerDoParallel(cl <- makeCluster(numCores))
+    registerDoParallel(cl <- makeCluster(numCores, outfile=""))
     runMethimputeJ <- function(j) {
       refRegion <- list(reg.obs = merge.list[[out.filelist$id[j]]])
       message("Running file: ", out.filelist$methfn[j], " for context: ", out.filelist$context[j], "\n")
