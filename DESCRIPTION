@@ -1,27 +1,32 @@
 Package: jDMRgrid
 Type: Package
 Title: A heuristic DMR caller for large-scale WGBS data
-Version: 0.2.0
-Author: Robert Piecyk - robert.piecyk@tum.de, Rashmi Hazarika - rashmi.hazarika@tum.de, Yadi Shahryary - y.shahryary@tum.de, Frank Johannes - frank@johanneslab.org
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
+Version: 0.2.1
+Authors@R: c(
+    person("Robert", "Piecyk", email = "robert.s.piecyk@gmail.com", role = c("cre","aut"), comment=c(ORCID="0000-0002-7962-2907")),
+    person("Rashmi", "Hazarika", email = "hazarika.rr@gmail.com", role = "aut"),
+    person("Yadollah", "Shahryary Dizaji", email = "shahryary@gmail.com", role = "aut"),
+    person("Frank", "Johannes", email = "frank@jlab.org", role = "aut"))
+Description: jDMRgrid is a component of the jDMR toolkit, an essential tool for conducting efficient and heuristic DMR (Differentially Methylated Region) calling in large-scale epigenomic studies involving population-level analyses and control/treatment experiments. 
+    Its functionality relies on a grid-based methodology that involves dividing the genome into sliding windows or bins of customizable sizes. 
+    It determines methylation state calls for each individual sliding window based on a Hidden Markov Model (HMM) approach. 
+    Subsequently, these calls are consolidated into a matrix format by merging data from all samples. 
+    Additionally, user can perform a filtration of DMR matrix to remove non-polymorphic patterns from the merged matrix.
 License: GPL-3
 Encoding: UTF-8
 LazyData: false
 LazyLoad: yes
 Depends:
-    R (>= 3.6.0),
-    GenomicRanges (>= 1.38.0),
-    R.utils (>= 2.10.1)
+    R (>= 4.3.0)
 Imports: 
     ape (>= 5.6.3),
+    GenomicRanges (>= 1.38.0),
+    R.utils (>= 2.10.1),
     data.table (>= 1.10),
     Biostrings (>= 2.40),
     dplyr (>= 1.0.5),
     methimpute (>= 1.8.0),
     stringr (>= 1.4),
-    seqinr (>= 4.2),
     ggplot2 (>= 3.3),
     rtracklayer (>= 1.46),
     tidyr (>= 1.1.3),
@@ -31,5 +36,22 @@ Imports:
     stats (>= 3.6.3),
     future.apply,
     doParallel,
-    future
+    future,
+    biocViews,
+    utils,
+    magrittr,
+    foreach,
+    grDevices,
+    methods,
+    parallel,
+    rlang
 RoxygenNote: 7.2.3
+VignetteBuilder: knitr
+Suggests: 
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+biocViews: Epigenetics, FunctionalGenomics, Genetics, MathematicalBiology, HiddenMarkovModel
+URL: https://github.com/robert-piecyk/jDMRgrid
+BugReports: https://github.com/robert-piecyk/jDMRgrid
+Config/testthat/edition: 3
