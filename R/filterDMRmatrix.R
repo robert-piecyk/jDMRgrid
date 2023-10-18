@@ -604,7 +604,8 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir)
 #' @param if.filtered
 #' 
 
-context.specific.DMRs <- function(samplefiles, input.dir, output.dir, if.filtered = FALSE){
+context.specific.DMRs <- function(
+        samplefiles, input.dir, output.dir, if.filtered = FALSE) {
     ft <- fread(samplefiles)
     if (!is.null(ft$group)){
         ft$name <- paste0(ft$sample,"_", ft$replicate)
