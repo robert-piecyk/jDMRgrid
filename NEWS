@@ -1,0 +1,9 @@
+# jDMRgrid 0.2.1
+
+Changes in version 0.2.2 (2023-10-19)
+* KISS & DRY code implementation
+
+
+Changes in version 0.2.1 (2023-10-18)
+* Added a `NEWS.md` file to track changes to the package.
+* Functions and vignette were modified according to the Bioconductor requirements. (3 notes only)

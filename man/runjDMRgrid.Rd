@@ -5,17 +5,9 @@
 \title{Run jDMR on binned genome}
 \usage{
 runjDMRgrid(
-  out.dir,
-  window,
-  step,
-  samplefiles,
-  contexts = c("CG", "CHG", "CHH"),
-  min.C,
-  mincov = 0,
-  include.intermediate = FALSE,
-  runName = "GridGenome",
-  numCores = NULL,
-  parallelApply = FALSE
+    out.dir, window, step, samplefiles, contexts = c("CG", "CHG", "CHH"),
+    min.C, mincov = 0, include.intermediate = FALSE, runName = "GridGenome",
+    numCores = NULL, parallelApply = FALSE
 )
 }
 \arguments{
@@ -25,22 +17,45 @@ runjDMRgrid(
 
 \item{step}{Step size. (numeric vector)}
 
-\item{samplefiles}{Path to the text file containing path to samples and sample names. For control/treatment data an additional column specifying the replicates is required. (character)}
+\item{samplefiles}{Path to the text file containing path to samples 
+and sample names. For control/treatment data an additional column 
+specifying the replicates is required. (character)}
 
-\item{contexts}{Vector of cytosine contexts selected for DMR calling. By default this option is set for all 3 cytosine contexts CG, CHG and CHH. (character vector)}
+\item{contexts}{Vector of cytosine contexts selected for DMR calling. By 
+default this option is set for all 3 cytosine contexts CG, CHG and CHH. 
+(character vector)}
 
-\item{min.C}{Percentile threshold based on empirical distribution of the cytosines across bins. (numeric value between 0 and 100)}
+\item{min.C}{Percentile threshold based on empirical distribution of the 
+cytosines across bins. (numeric value between 0 and 100)}
 
-\item{mincov}{Minimum read coverage over cytosines. By default this option is set as 0. (numeric value between 0 and 1)}
+\item{mincov}{Minimum read coverage over cytosines. 
+By default this option is set as 0. (numeric value between 0 and 1)}
 
-\item{include.intermediate}{A logical specifying whether or not the intermediate component should be included in the HMM model. By default this option is set as FALSE. (logical)}
+\item{include.intermediate}{A logical specifying whether or not the 
+intermediate component should be included in the HMM model. 
+By default this option is set as FALSE. (logical)}
 
-\item{runName}{Name of the operation. By default this option is set to 'GridGenome'. (character)}
+\item{runName}{Name of the operation. By default this option is 
+set to 'GridGenome'. (character)}
 
-\item{numCores}{Number of cores to perform parallel operation using foreach loop. Default to NULL. (numeric)}
+\item{numCores}{Number of cores to perform parallel operation using 
+foreach loop. Default to NULL. (numeric)}
 
-\item{parallelApply}{A logical specifying if futureapply method should be performed to use parallel operation. Default to FALSE. (logical)}
+\item{parallelApply}{A logical specifying if futureapply method should be 
+performed to use parallel operation. Default to FALSE. (logical)}
+}
+\value{
+output files containing matrices of state calls, methylation levels 
+and optionally postMax probabilities.
 }
 \description{
-this function runs a HMM model on a genome binned using a sliding/non-sliding window approach
+this function runs a HMM model on a genome binned using a 
+sliding/non-sliding window approach
+}
+\examples{
+runjDMRgrid(out.dir = 'folder_replicate/grid',
+            window = 200, step = 50, samplefiles = system.file(
+                "extdata", "listFiles2.fn", package="jDMRgrid"),
+            contexts = c("CG", "CHG", "CHH"), min.C = 10, mincov = 0,
+            include.intermediate = TRUE, runName = "Arabidopsis")
 }
