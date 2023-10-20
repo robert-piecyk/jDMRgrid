@@ -321,7 +321,7 @@ By default, this option is set to NULL.
 sample names. For control/treatment data an additional column specifying 
 the replicates is required.
 
-**mergingBins** : Logical argument if merging consecutive bins having the 
+**if.mergingBins** : Logical argument if merging consecutive bins having the 
 same stateCalls should be performed. By default set to TRUE. (logical)
 
 \setlength{\leftskip}{0pt}
@@ -331,12 +331,12 @@ same stateCalls should be performed. By default set to TRUE. (logical)
 filterDMRmatrix(
     epiMAF.cutoff = 0.33, replicate.consensus = NULL, 
     data.dir = paste0(out.dir.pop, "/matrix"), samplefiles = system.file(
-        "extdata", "listFiles1.fn", package="jDMRgrid"), mergingBins = FALSE)
+        "extdata", "listFiles1.fn", package="jDMRgrid"), if.mergingBins = FALSE)
 
 filterDMRmatrix(
     epiMAF.cutoff = NULL, replicate.consensus = 0.8, 
     data.dir = paste0(out.dir.rep, "/matrix"), samplefiles = system.file(
-        "extdata", "listFiles2.fn", package="jDMRgrid"), mergingBins = FALSE)
+        "extdata", "listFiles2.fn", package="jDMRgrid"), if.mergingBins = FALSE)
 
 
 ```
@@ -399,7 +399,7 @@ PATH to the "input.dir" option.
 Any file containing 3 columns (chr, start, stop) can be annotated 
 using the annotateDMRs function.
 
-**gff3.out**: whether to output annotated files in gff3 format
+**if.gff3**: whether to output annotated files in gff3 format
 
 **out.dir**: path to output folder
 

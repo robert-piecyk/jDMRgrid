@@ -1,12 +1,12 @@
 Package: jDMRgrid
 Type: Package
 Title: A heuristic DMR caller for large-scale WGBS data
-Version: 0.2.1
+Version: 0.2.2
 Authors@R: c(
-    person("Robert", "Piecyk", email = "robert.s.piecyk@gmail.com", role = c("cre","aut"), comment=c(ORCID="0000-0002-7962-2907")),
-    person("Rashmi", "Hazarika", email = "hazarika.rr@gmail.com", role = "aut"),
-    person("Yadollah", "Shahryary Dizaji", email = "shahryary@gmail.com", role = "aut"),
-    person("Frank", "Johannes", email = "frank@jlab.org", role = "aut"))
+    person(given = c("Robert", "Stefan"), family = "Piecyk", email = "robert.s.piecyk@gmail.com", role = c("cre","aut"), comment=c(ORCID="0000-0002-7962-2907")),
+    person(given = c("Rashmi", "Rekha"), family = "Hazarika", email = "hazarika.rr@gmail.com", role = "aut"),
+    person(given = "Yadollah", family = c("Shahryary", "Dizaji"), email = "shahryary@gmail.com", role = "aut"),
+    person(given = "Frank", family = "Johannes", email = "frank@jlab.org", role = "aut"))
 Description: jDMRgrid is a component of the jDMR toolkit, an essential tool for conducting efficient and heuristic DMR (Differentially Methylated Region) calling in large-scale epigenomic studies involving population-level analyses and control/treatment experiments. 
     Its functionality relies on a grid-based methodology that involves dividing the genome into sliding windows or bins of customizable sizes. 
     It determines methylation state calls for each individual sliding window based on a Hidden Markov Model (HMM) approach. 

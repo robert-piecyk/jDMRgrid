@@ -4,7 +4,7 @@
 \usage{
 filterDMRmatrix(
     epiMAF.cutoff = NULL, replicate.consensus = NULL, data.dir, samplefiles,
-    mergingBins = TRUE)
+    if.mergingBins = TRUE)
 }
 \arguments{
 \item{epiMAF.cutoff}{Numeric threshold to filter for minor epi-allele 

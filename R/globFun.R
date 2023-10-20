@@ -8,7 +8,6 @@ floorDec <- function(valParm ,x){
 #' @param file_A
 #' @importFrom utils
 #' @importFrom stringr str_replace_all
-#' @export
 #'
 statusStringCheck <-  function(file_A){
     list_status <- c("Unmethylated", "Intermediate", "Methylated")

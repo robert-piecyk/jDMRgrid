@@ -7,21 +7,29 @@ makeDMRmatrix(
     input.dir, out.dir, include.intermediate = FALSE)
 }
 \arguments{
-\item{samplefiles}{file containing full path of base level methylation calls, 
-sample names and replicates(optional)}
+\item{contexts}{Vector of cytosine contexts selected for DMR calling. By 
+default this option is set for all 3 cytosine contexts CG, CHG and CHH. 
+(character vector; by default c('CG','CHG','CHH'))}
 
-\item{input.dir}{input directory containing all region level methylome calls}
+\item{postMax.out}{(A logical specyfing whether or not to output posterior
+probability for the identified state call known as postMax probability.
+(optional; logical; by default is FALSE))}
 
-\item{out.dir}{output directory}
+\item{samplefiles}{File containing full path of base level methylation calls, 
+sample names and replicates(optional; character)}
+
+\item{input.dir}{Path to the input directory containing all region level 
+methylome calls (character)}
+
+\item{out.dir}{Path to the output directory (character)}
 
 \item{include.intermediate}{A logical specifying whether or not the 
 intermediate component should be included in the HMM model.
-By default this option is set as FALSE.}
+(optional; logical; be default is FALSE)}
 
-\item{context}{cytosine context}
 }
 \value{
-output files containing matrices of state calls, methylation levels and 
+Output files containing matrices of state calls, methylation levels and 
 optionally postMax probabilities.
 }
 \description{

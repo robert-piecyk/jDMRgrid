@@ -2,7 +2,7 @@
 \alias{annotateDMRs}
 \title{Annotate DMRs}
 \usage{
-annotateDMRs(annotation, gff.files, gff3.out, input.dir, out.dir)
+annotateDMRs(annotation, gff.files, if.gff3, input.dir, out.dir)
 }
 \arguments{
 \item{annotation}{annotation terms used to annotate DMRs}

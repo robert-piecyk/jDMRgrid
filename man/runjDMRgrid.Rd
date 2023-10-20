@@ -53,6 +53,12 @@ this function runs a HMM model on a genome binned using a
 sliding/non-sliding window approach
 }
 \examples{
+# Step 1.1: Copy required files and create required directories for outputs
+system2('mkdir folder_replicate')
+system2('mkdir folder_replicate/grid')
+system2(paste0(
+    'cp -r ', system.file("extdata", "toyData", package="jDMRgrid"), ' .'))
+# Step 1.2: runjDMRgrid
 runjDMRgrid(out.dir = 'folder_replicate/grid',
             window = 200, step = 50, samplefiles = system.file(
                 "extdata", "listFiles2.fn", package="jDMRgrid"),
