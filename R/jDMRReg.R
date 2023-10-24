@@ -10,6 +10,7 @@
 #' @param miny
 #' @importFrom minpack.lm nlsLM
 #' @importFrom stats na.omit coefficients
+#' @return
 #'
 calculateDecayingConstance <- function(
         contexts, c1, c2, cor.array, dfs, maxweights, params.list, miny, skip) 
@@ -60,6 +61,7 @@ calculateDecayingConstance <- function(
 #' Obtain an estimate for the transDist parameter by fitting an exponential 
 #' function to the supplied correlations from distanceCorrelation. 
 #' Modified function from the methIMPUTE package.
+#' @inheritParams calculateDecayingConstance
 #' @param distcor The output produced by distanceCorrelation.
 #' @param skip Skip the first n cytosines for the fitting.
 #' @param plot.parameters Whether to plot fitted params on to the plot or not.
@@ -67,16 +69,13 @@ calculateDecayingConstance <- function(
 #' @import magrittr
 #' @importFrom minpack.lm nlsLM
 #' @importFrom grDevices dev.off pdf
-#' @importFrom data.table fread
-#' @importFrom data.table fwrite
+#' @importFrom data.table fread fwrite
 #' @importFrom stringr str_replace_all
 #' @importFrom dplyr bind_rows filter
 #' @importFrom stats na.omit coefficients
 #' @importFrom GenomicRanges GRanges findOverlaps
 #' @importFrom S4Vectors queryHits subjectHits
-#' @importFrom methimpute callMethylation
-#' @importFrom methimpute distanceCorrelation
-#' @export
+#' @return
 #' 
 modified.estimateTransDist <- function(distcor, skip, plot.parameters=TRUE) {
     contexts <- dimnames(distcor$data)[[1]]
@@ -128,8 +127,13 @@ modified.estimateTransDist <- function(distcor, skip, plot.parameters=TRUE) {
 
 #--------------------------------------------------------------------------
 #'
+#' @param model
+#' @param out.dir
+#' @param context
+#' @param name
 #' @import magrittr
 #' @importFrom data.table fwrite fread
+#' @return 
 #' 
 modifiedExportMethylome <- function(model, out.dir, context, name) {
     #data <- model$data
@@ -165,8 +169,12 @@ modifiedExportMethylome <- function(model, out.dir, context, name) {
 
 #--------------------------------------------------------------------------
 #' How many cytosines are methylated and unmethylated in methimpute file
+#' @param overlaps
+#' @param overlaps.hits
+#' @param data_gr
 #' @importFrom stats aggregate
 #' @importFrom dplyr bind_rows
+#' @return
 #' 
 findMethylatedOrUnmethylated <- function(overlaps, overlaps.hits, data_gr)
 {
@@ -195,6 +203,11 @@ findMethylatedOrUnmethylated <- function(overlaps, overlaps.hits, data_gr)
 
 #--------------------------------------------------------------------------
 #' Transform methimpute dataset with single cytosine according to the bins
+#' @param df
+#' @param context
+#' @param refRegion
+#' @param mincov
+#' @param nCytosines
 #' @import magrittr
 #' @importFrom dplyr filter
 #' @importFrom data.table fread
@@ -202,6 +215,7 @@ findMethylatedOrUnmethylated <- function(overlaps, overlaps.hits, data_gr)
 #' @importFrom S4Vectors queryHits subjectHits
 #' @importFrom stats aggregate
 #' @importFrom dplyr bind_rows
+#' @return
 #' 
 makeRegionsImpute <- function(df, context, refRegion, mincov, nCytosines) {
     tmp_reg <- refRegion
@@ -238,8 +252,21 @@ makeRegionsImpute <- function(df, context, refRegion, mincov, nCytosines) {
 }
 
 #--------------------------------------------------------------------------
-#' 
-#' 
+#' Perform HMM for state calling within binned genome
+#' @inheritParams modified.estimateTransDist
+#' @inheritParams modifiedExportMethylome
+#' @param df DataFrame with binned genome. ()
+#' @param context Methylation contexts. (char)
+#' @param fit.plot
+#' @param fit.name
+#' @param refRegion
+#' @param include.intermediate
+#' @param probability
+#' @param out.dir
+#' @param name
+#' @param mincov
+#' @importFrom methimpute distanceCorrelation callMethylation
+#' @return 
 #' 
 makeMethimpute <- function(
         df, context, fit.plot, fit.name, refRegion, include.intermediate, 

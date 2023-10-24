@@ -1,10 +1,12 @@
 #------------------------------------------------------------------------------
 #' Bind list of replicates (as part of lapply function)
-#' @param x Numeric value (nrows of status.collect)
-#' @param status.collect Dataset with state-calls in df
+#' @param x Number of rows in state-calls file. (num)
+#' @param status.collect DataFrame with state-calls. (DataFrame object)
 #' @param sampleinfo Information about samples and their replicates in df
 #' @param replicate.consensus Percentage of concordance in state calls in num
 #' @param diffct Allowed difference between control and treatment groups in num
+#' @return A logical if the following row meets replicate consensus criterion 
+#'         and should be included in the filtered dataset.
 #' 
 bindReplicateLists <- function(
         x, mypattern, df.bind, sampleinfo, replicate.consensus, diff.ct,
@@ -56,15 +58,18 @@ bindReplicateLists <- function(
 
 #-----------------------------------------------------------------------------
 #' Application of filtering using replicate consensus
-#' @param status.collect Dataset with state-calls
-#' @param rc.methlevel.collect Dataset wtih methylation levels
-#' @param replicate.consensus Percentage of concordance in state calls
-#' @param diff.ct Allowed difference between control and treatment groups
+#' @param status.collect DataFrame for state-calls. (DataFrame object)
+#' @param rc.methlevel.collect DataFrame rc-methylation levels. 
+#'                             (DataFrame object)
+#' @param replicate.consensus Percentage of concordance in state calls. (num)
+#' @param diff.ct Allowed difference between control and treatment groups. (num)
 #' @import magrittr
 #' @importFrom data.table fread
 #' @importFrom data.table rbindlist
 #' @importFrom dplyr semi_join summarize
 #' @importFrom utils setTxtProgressBar txtProgressBar
+#' @return List of data frames for rc-methylation level and state-calls using 
+#'         replicate-consensus criterion.
 #' @export
 #'
 filterReplicateConsensus <- function(
@@ -114,13 +119,17 @@ filterReplicateConsensus <- function(
 
 #-----------------------------------------------------------------------------
 #' Application of filtering using epiMAF criterion
-#' @param status.collect Dataset with state-calls
-#' @param rc.methlevel.collect Dataset wtih methylation levels
-#' @param epiMAF Threshold to filter for minor epi-allele frequency
+#' @param status.collect DataFrame for state-calls. (DataFrame object)
+#' @param rc.methlevel.collect DataFrame rc-methylation levels. 
+#'                             (DataFrame object)
+#' @param epiMAF Threshold to filter for minor epi-allele frequency. (num)
 #' @import magrittr
 #' @importFrom dplyr semi_join
 #' @importFrom utils setTxtProgressBar txtProgressBar
+#' @return List of data frames for rc-methylation level and state-calls using 
+#'         minor epi-allele frequency criterion.
 #' @export
+#' 
 filterEpiMAF <- function(status.collect, rc.methlevel.collect, epiMAF){
     floorDec <- function(valParm ,x){
         y <- function(x, level=1) round(x - 5*10^(-level-1), level)
@@ -150,7 +159,7 @@ filterEpiMAF <- function(status.collect, rc.methlevel.collect, epiMAF){
             df.status.collect, by=c("seqnames","start","end"))
         return(list(df.status.collect, df.rc.methlevel.collect))
     } else {
-        message("Empty dataframe. Nothing to write!")
+        message("Empty data frame. Nothing to write!")
         return(NULL)
     }
 }
@@ -158,16 +167,14 @@ filterEpiMAF <- function(status.collect, rc.methlevel.collect, epiMAF){
 #------------------------------------------------------------------------------
 #' Merge bins having the same state-calls and calculate mean of their
 #' methylation levels
-#' @param rcmethlvl_data Dataset wtih methylation levels
-#' @param statecalls_data Dataset with state-calls
+#' @param rcmethlvl_data DataFrame rc-methylation levels. 
+#'                       (DataFrame object)
+#' @param statecalls_data DataFrame for state-calls. (DataFrame object)
 #' @import magrittr
-#' @importFrom GenomicRanges makeGRangesFromDataFrame
-#' @importFrom GenomicRanges reduce
-#' @importFrom GenomicRanges findOverlaps
-#' @importFrom data.table fread
-#' @importFrom data.table fwrite
-#' @importFrom data.table rbindlist
-#' @export
+#' @importFrom GenomicRanges makeGRangesFromDataFrame reduce findOverlaps
+#' @importFrom data.table fread fwrite rbindlist
+#' @return List of data frames for rc-methylation level and state-calls with
+#'         merged neighbouring bins having similar state-call profile.
 #' 
 merge.bins <- function(rcmethlvl_data, statecalls_data)
 {
@@ -220,15 +227,17 @@ merge.bins <- function(rcmethlvl_data, statecalls_data)
 }
 
 #------------------------------------------------------------------------------
-#' Export methylation levels, state calls at a given context, sample name 
-#' and path
-#' @param out.rcmethlvl
-#' @param out.statecalls
-#' @param context
-#' @param out.name1
-#' @param out.name2
-#' @param data.out 
+#' Save methylation levels and state calls at a given context as txt file
+#' @param out.rcmethlvl Output DataFrame rc-methylation levels. 
+#'                      (DataFrame object)
+#' @param out.statecalls Output DataFrame for state-calls. (DataFrame object)
+#' @param context Methylation context. (char)
+#' @param out.name1 Name for the state-call file. (char)
+#' @param out.name2 Name for the rc-methylation level file. (char)
+#' @param data.out Path to the output directory. (char)
 #' @import data.table fwrite
+#' @return Output DMR matrices for state-calls and rc-methylation levels as 
+#'         txt file.
 #' 
 export.out <- function(
         out.rcmethlvl,out.statecalls,context,out.name1,out.name2,data.out){
@@ -245,12 +254,18 @@ export.out <- function(
 
 #------------------------------------------------------------------------------
 #' Remove non-polymorphic state-calls only by merging bins if applicable
-#' @param status.collect Dataset with state-calls
-#' @param rc.methlevel.collect Dataset with rc-methylation levels
-#' @param context Methylation context
-#' @param data.dir Directory to save dataset
-#' @param if.mergingBins Logical if merging bins should be applied.
-#' 
+#' @inheritParams merge.bins
+#' @inheritParams export.out
+#' @param status.collect DataFrame for state-calls. (DataFrame object)
+#' @param rc.methlevel.collect DataFrame rc-methylation levels. 
+#'                             (DataFrame object)
+#' @param context Methylation context. (char)
+#' @param data.dir Path to the output directory. (char)
+#' @param if.mergingBins Logical if bins with same state-calls profile among
+#'                       samples should be merged. (logical)
+#' @return Filtrated state-calls and methylation DMR matrices using 
+#'         merging bins criterion.
+#'
 removeNonPolymorphicOnly <- function(
         status.collect, rc.methlevel.collect, context, data.dir, 
         if.mergingBins) {
@@ -272,13 +287,21 @@ removeNonPolymorphicOnly <- function(
 
 #------------------------------------------------------------------------------
 #' Apply epiMAF filtering and merging bins if applicable
-#' @param status.collect Dataset with state-calls
-#' @param rc.methlevel.collect Dataset with rc-methylation levels
-#' @param context Methylation context
-#' @param data.dir Directory to save dataset
-#' @param epiMAF.cutoff Threshold to filter for minor epi-allele frequency
-#' @param if.mergingBins Logical if merging bins should be applied
-#' 
+#' @inheritParams filterEpiMAF
+#' @inheritParams merge.bins
+#' @inheritParams export.out
+#' @param status.collect DataFrame for state-calls. (DataFrame object)
+#' @param rc.methlevel.collect DataFrame rc-methylation levels. 
+#'                             (DataFrame object)
+#' @param context Methylation context. (char)
+#' @param data.dir Path to the output directory. (char)
+#' @param epiMAF.cutoff Threshold to filter for 
+#'                      the minor epi-allele frequency. (num)
+#' @param if.mergingBins Logical if bins with same state-calls profile among
+#'                       samples should be merged. (logical)
+#' @return Filtrated state-calls and methylation DMR matrices using epi-allele
+#'         frequency criterion and merging bins, if applicable
+#'         
 populationFiltering <- function(
         status.collect, rc.methlevel.collect, context, data.dir, 
         epiMAF.cutoff, if.mergingBins) {
@@ -322,13 +345,20 @@ populationFiltering <- function(
 
 #------------------------------------------------------------------------------
 #' Apply replicate consensus filtering and merging bins if applicable
-#' @param status.collect Dataset with state-calls. (data frame)
-#' @param rc.methlevel.collect Dataset with rc-methylation levels. (data frame)
+#' @inheritParams filterReplicateConsensus
+#' @inheritParams merge.bins
+#' @inheritParams export.out
+#' @param status.collect DataFrame for state-calls. (DataFrame object)
+#' @param rc.methlevel.collect DataFrame rc-methylation levels. 
+#'                             (DataFrame object)
 #' @param context Methylation context. (char)
-#' @param data.dir Directory to save dataset. (char)
+#' @param data.dir Path to the output directory. (char)
 #' @param replicate.consensus Percentage of concordance in state calls. (num)
-#' @param if.mergingBins A logical if merging bins should be applied. (logical)
+#' @param if.mergingBins Logical if bins with same state-calls profile among
+#'                       samples should be merged. (logical)
 #' @param diff.ct Allowed difference between control and treatment groups. (num)
+#' @return Filtrated state-calls and methylation DMR matrices using replicate
+#'         consensus and merging bins, if applicable
 #' 
 replicateFiltering <- function(
         status.collect, rc.methlevel.collect, context, data.dir, 
@@ -369,14 +399,21 @@ replicateFiltering <- function(
 }
 
 #------------------------------------------------------------------------------
-#' Filter DMR matrix among contexts after reading samplefiles
-#' @param list.status List of the sample files after implementation of grid
-#' @param data.dir Input and Output directory for filtered DMR matrices
-#' @param replicate.consensus Percentage of concordance in state calls
-#' @param epiMAF.cutoff Threshold to filter for minor epi-allele frequency
-#' @param if.mergingBins Logical if merging bins should be applied
+#' Filter DMR matrix among contexts
+#' @inheritParams removeNonPolymorphicOnly
+#' @inheritParams populationFiltering
+#' @inheritParams replicateFiltering
+#' @param list.status Vector with the filenames for state-calls matrices. (char)
+#' @param data.dir Path to the input/output directory for 
+#'                 raw/filtered DMR matrices. (char)
+#' @param replicate.consensus Percentage of concordance in state calls. (num)
+#' @param epiMAF.cutoff Threshold to filter for minor epi-allele frequency. 
+#'                      (num)
+#' @param if.mergingBins Logical if bins with same state-calls profile among
+#'                       samples should be merged. (logical)
 #' @import magrittr
-#' @importFrom data.table frea
+#' @importFrom data.table fread
+#' @return Filtrated state-calls and methylation DMR matrices
 #'
 filteringAmongContexts <- function(
         list.status, data.dir, replicate.consensus, epiMAF.cutoff, 
@@ -416,7 +453,8 @@ filteringAmongContexts <- function(
                 status.collect = status.collect, 
                 rc.methlevel.collect = rc.methlevel.collect, 
                 context = context, data.dir = data.dir, 
-                epiMAF.cutoff = epiMAF.cutoff, if.mergingBins = if.mergingBins)}
+                epiMAF.cutoff = epiMAF.cutoff, 
+                if.mergingBins = if.mergingBins)}
         # retaining samples based on replicate.consensus
         if (!is.null(replicate.consensus)) {
             replicateFiltering(
@@ -430,32 +468,43 @@ filteringAmongContexts <- function(
 
 #------------------------------------------------------------------------------
 #' Filter DMR matrix. Filters non-polymorphic patterns by default.
-#' @param epiMAF.cutoff Threshold to filter for minor epi-allele frequency
-#' @param replicate.consensus Percentage of concordance in state calls
-#' @param data.dir Path to the directory containing DMR matrix files
-#' @param samplefiles Path to the text file containing path to samples
-#' @param if.mergingBins Logical if merging bins should be applied
+#' @inheritParams filteringAmongContexts
+#' @param epiMAF.cutoff Threshold to filter for 
+#'                      minor epi-allele frequency. (num; default as NULL)
+#' @param replicate.consensus Percentage of concordance in state calls.
+#'                            (num; default as NULL)
+#' @param data.dir Path to the directory containing DMR matrix files. (char)
+#' @param samplelist DataFrame object containing information about
+#'                   file, sample, replicate and group. (DataFrame object)
+#' @param if.mergingBins Logical if bins with same state-calls profile among
+#'                       samples should be merged. (logical; default as FALSE)
 #' @import magrittr
 #' @importFrom data.table fread
+#' @return Filtrated state-calls and methylation DMR matrices using:
+#'         filtration for non-polymorphic patterns and 
+#'         (epiMAF for population-based data or 
+#'         replicate consensus for control/treatment data) 
+#'         and/or merging neighbouring bins with same state calls profiles.
 #' @export
 #'
 filterDMRmatrix <- function(
-        epiMAF.cutoff=NULL,replicate.consensus=NULL,data.dir,samplefiles,
-        if.mergingBins=TRUE) 
+        epiMAF.cutoff = NULL, replicate.consensus = NULL, data.dir, 
+        samplelist, if.mergingBins = FALSE) 
 {
     contexts <- unique(sub("_.*", "", list.files(data.dir, pattern = 'C')))
-    ft <- fread(samplefiles)
-    if (!is.null(ft$group)){
-        ft$name <- paste0(ft$sample,"_", ft$replicate)
-        gps <- ft$group[!ft$group %in% c('control')]
+    if (!is.null(samplelist$group)){
+        samplelist$name <- paste0(samplelist$sample,"_", samplelist$replicate)
+        gps <- samplelist$group[!samplelist$group %in% c('control')]
         gps <- unique(gps)
         
         list.collect2 <- lapply(seq_along(gps), function(m) {
             myvec <- c("control", gps[m])
-            gp1 <- ft$name[which(ft$group == myvec[1])]
-            gp2 <- ft$name[which(ft$group == myvec[2])]
-            gp1.sample <- unique(ft$sample[which(ft$name == gp1)])
-            gp2.sample <- unique(ft$sample[which(ft$name == gp2)])
+            gp1 <- samplelist$name[which(samplelist$group == myvec[1])]
+            gp2 <- samplelist$name[which(samplelist$group == myvec[2])]
+            gp1.sample <- unique(
+                samplelist$sample[which(samplelist$name == gp1)])
+            gp2.sample <- unique(
+                samplelist$sample[which(samplelist$name == gp2)])
             out.name <- paste0(gp1.sample, "_", gp2.sample)
             
             list.collect1 <- lapply(seq_along(contexts), function(cn) {
@@ -482,10 +531,13 @@ filterDMRmatrix <- function(
 
 #------------------------------------------------------------------------------
 #' Read state calls files for each context and create their GRanges objects
-#' @param file.list Vector with paths to state calls for CG, CHG and CHH
+#' @param file.list Path to the DMR matrices with state calls for 
+#'                  CG, CHG and CHH contexts. (char)
 #' @importFrom data.table fread
 #' @importFrom GenomicRanges GRanges
 #' @importFrom IRanges subsetByOverlaps
+#' @return List of data frames and GRanges objects of state calls; for each
+#'         methylation contexts separately.
 #' 
 DMR.list.in <- function(file.list) {
     contexts <- c('CG','CHG','CHH')
@@ -498,24 +550,34 @@ DMR.list.in <- function(file.list) {
 }
 
 #------------------------------------------------------------------------------
-#' Write data for identified DMRs
-#' @param context.df
-#' @param out.name
-#' @param data.out
-#' @importFrom data.table fread
+#' Save DataFrame with context-specific DMRs as txt file
+#' @param context.df DataFrame with filtrated context-specific DMRs
+#'                   (DataFrame object).
+#' @param out.name Name sample_replicate_context_group-of-analysis OR
+#'                 context_group-of-analysis. (char)
+#' @param data.out Path to the output directory. (char)
+#' @importFrom data.table fwrite
+#' @return Context-specific DMRs saved as the txt files in the output directory.
 #' 
 DMR.list.out <- function(context.df, out.name, data.out){
     fwrite(
-        x=context.df, file=paste0(data.out, "/", out.name,".txt"),quote=FALSE, 
+        x=context.df, file=paste0(data.out, "/", out.name,".txt"), quote=FALSE, 
         row.names=FALSE, col.names=TRUE, sep="\t")
 }
 
 #------------------------------------------------------------------------------
-#' Identify DMRs which are occuring only at a given context
-#' @param context Methylation context for which unique DMRs are identified
-#' @param list.out List of state calls and their GRanges for each context
+#' Identify DMRs which are occuring only at a given context 
+#' (for non-CG and multi-context DMRs)
+#' @param context Methylation context for which unique DMRs are identified;
+#'                "CG", "CHG" or "CHH". (char)
+#' @param list.out List of state calls and their GRanges for each context. 
+#'                 (list)
+#' @param data.dir Path to the output directory. (char)
+#' @param tmp.name For group-specific analysis: vector with with 
+#'                 sample_replicate names. (char)
 #' @import magrittr
 #' @importFrom dplyr semi_join
+#' @return 
 #' 
 DMR.onlyContext <- function(context, list.out, data.dir, tmp.name) {
     message('Generating ', context, '-only DMRs...')
@@ -536,12 +598,14 @@ DMR.onlyContext <- function(context, list.out, data.dir, tmp.name) {
 }
 
 #------------------------------------------------------------------------------
-#' Extract context-specific DMRs for the provided list of state-calls paths
-#' @param file1 state calls for CG context
-#' @param file2 state calls for CHG context
-#' @param file3 state calls for CHH context
-#' @param tmp.name Temp name 
-#' @param data.dir Input directory
+#' Main function to extract context-specific DMRs 
+#' for the provided list of state-calls paths
+#' @param file1 Path to the DMR matrix state calls for CG context. (char)
+#' @param file2 Path to the DMR matrix state calls for CHG context. (char)
+#' @param file3 Path to the DMR matrix state calls for CHH context. (char)
+#' @param tmp.name For group-specific analysis: vector with with 
+#'                 sample_replicate names. (char)
+#' @param data.dir Path to the output directory. (char)
 #' @import magrittr
 #' @importFrom IRanges subsetByOverlaps
 #' @importFrom dplyr semi_join
@@ -558,12 +622,12 @@ DMR.onlyContext <- function(context, list.out, data.dir, tmp.name) {
 #' @importFrom utils setTxtProgressBar txtProgressBar
 #' @importFrom IRanges setTxtProgressBar txtProgressBar subsetByOverlaps
 #' @importFrom rlang .data
+#' @return Output files containing context-specific DMRs in txt format
 #'
 extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir)
 {
     if (file.exists(file1) && file.exists(file2) && file.exists(file3)) {
         list.out <- DMR.list.in(c(file1, file2, file3))
-        
         # context-only
         DMR.onlyContext(
             'CG', list.out = list.out, data.dir = data.dir, 
@@ -574,7 +638,6 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir)
         DMR.onlyContext(
             'CHH', list.out = list.out, data.dir = data.dir,
             tmp.name = tmp.name) #CHH
-        
         #non-CG
         message("Generating non-CG DMRs...")
         gr.nonCG <- subsetByOverlaps(list.out[[2]][[2]], list.out[[2]][[3]])
@@ -587,7 +650,6 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir)
             context.df=nonCG, out.name=paste0(tmp.name, "nonCG-DMRs"),
             data.out=data.dir)
         message("Done!")
-        
         #multi-context
         message("Generating multi-context DMRs...")
         CG.gr <- list.out[[2]][[1]]
@@ -610,27 +672,37 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir)
 }
 
 #------------------------------------------------------------------------------
-#' Find context-specific DMRs (only at a given context, nonCG or multi-context)
-#' @param samplefiles  Path to the text file containing path to samples
-#' @param input.dir Path to input directory with state-calls matrices
-#' @param output.dir Path to output directory 
-#' @param if.filtered A logical to specify to use filtered matrices or not
+#' Output context-specific DMRs (only for a given context, nonCG or all context)
+#' @param samplelist DataFrame object containing information about
+#'                   file, sample, replicate and group. (DataFrame object)
+#' @param input.dir Path to the input directory with DMR matrices. (char)
+#' @param output.dir Path to the output directory. (char)
+#' @param if.filtered Logical to specify if we should use filtered or
+#'                    non-filtered matrices. (logical)
+#' @importFrom data.table fread
+#' @return Output files containing context-specific DMRs for five categories:
+#'         CG-only, 
+#'         CHG-only, 
+#'         CHH-only, 
+#'         non-CG (occurs for CHG and/or CHH, but not for CG context), 
+#'         multi-context (occurs for CG and CHG and CHH contexts)
 #' @export
 #' 
 context.specific.DMRs <- function(
-        samplefiles, input.dir, output.dir, if.filtered = FALSE) {
-    ft <- fread(samplefiles)
-    if (!is.null(ft$group)){
-        ft$name <- paste0(ft$sample,"_", ft$replicate)
-        gps <- ft$group[!ft$group %in% c('control')]
+        samplelist, input.dir, output.dir, if.filtered = FALSE) {
+    if (!is.null(samplelist$group)){
+        samplelist$name <- paste0(samplelist$sample,"_", samplelist$replicate)
+        gps <- samplelist$group[!samplelist$group %in% c('control')]
         gps <- unique(gps)
         for (m in seq_along(gps)){
             myvec <- c("control", gps[m])
-            gp1 <- ft$name[which(ft$group==myvec[1])]
-            gp2 <- ft$name[which(ft$group==myvec[2])]
+            gp1 <- samplelist$name[which(samplelist$group==myvec[1])]
+            gp2 <- samplelist$name[which(samplelist$group==myvec[2])]
             
-            gp1.sample <- unique(ft$sample[which(ft$name==gp1)])
-            gp2.sample <- unique(ft$sample[which(ft$name==gp2)])
+            gp1.sample <- unique(
+                samplelist$sample[which(samplelist$name==gp1)])
+            gp2.sample <- unique(
+                samplelist$sample[which(samplelist$name==gp2)])
             message("Generating context specific DMRs for ",
                     gp1.sample, "-", gp2.sample,"\n")
             name_string <- ifelse(

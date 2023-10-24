@@ -1,8 +1,8 @@
 #-----------------------------------------------------------------------------
 #' Import gff files
-#' @param gff Paths to gff files
+#' @param gff Paths to gff files. (char)
 #' @importFrom  rtracklayer import.gff3
-#' @return merge all supplied gff3 annotations into one
+#' @return Merge all supplied gff3 annotations into one
 #' 
 gff3.in <- function(gff){
     input.gff <- lapply(gff, function(x){
@@ -13,19 +13,22 @@ gff3.in <- function(gff){
 }
 
 #-----------------------------------------------------------------------------
+#' Find overlaps between annotation and DMRs; return as GRanges object and
+#' save as gff file. The following annotation could be detected:
 #' "chromosome","gene","mRNA","five_prime_UTR","exon","CDS",
 #' "three_prime_UTR","ncRNA_gene","lnc_RNA","miRNA","tRNA","ncRNA",
 #' "snoRNA","snRNA","rRNA","TE","promoters"
-#' Output annotated gff3 files
-#' @param gff
-#' @param annotation
-#' @param grangesObj
-#' @param name
-#' @param out.dir output directory
+#' @param gff GenomicRanges object with set of regions/DMRs 
+#'            (GenomicRanges object)
+#' @param annotation Names of annotations to be detected in gff. (char)
+#' @param grangesObj GRanges of regions/DMRs. (GRanges object)
+#' @param gff GFF3 file with all annotations. (S4 object)
+#' @param name Filename generated in annotation function. (char) 
+#' @param out.dir Path to the output directory. (char)
 #' @importFrom GenomicRanges findOverlaps
 #' @importFrom  rtracklayer export.gff
 #' @importFrom  S4Vectors values values<- elementMetadata<-
-#' @return export output files in gff3 format
+#' @return Export output files in gff3 format
 #' 
 gff3.out <- function(annotation, grangesObj, gff, name, out.dir) {
     getgff3 <- lapply(annotation, function(x){
@@ -48,19 +51,10 @@ gff3.out <- function(annotation, grangesObj, gff, name, out.dir) {
 
 #-----------------------------------------------------------------------------
 #' Extract annotated regions
-#' @inheritParams gff3.in
-#' @param gff
-#' @param annotation
-#' @param grangesObj
-#' @param name
-#' @param out.dir output directory
-#' @param getAnno
-#' @param mygff
-#' @param mygr
-#' @param annotation
-#' @param gff.files
-#' @param gff3.out
-#' @param input.dir
+#' @param getAnno Annotation terms used to annotate DMRs. (char)
+#' @param mygff GFF objects corresponding to the annotation terms. (S4 object)
+#' @param mygr GenomicRanges object with set of regions/DMRs 
+#'             (GenomicRanges object)
 #' @import magrittr
 #' @importFrom dplyr mutate id
 #' @importFrom GenomicRanges findOverlaps subsetByOverlaps seqnames
@@ -71,9 +65,14 @@ gff3.out <- function(annotation, grangesObj, gff, name, out.dir) {
 #' @importFrom methods as
 #' @importFrom rlang .data
 #' @importFrom tidyr unnest
-#' @return annotated list
+#' @return List of data frames; for each annotation term separately, subset
+#'         by the overlaps between corresponding GFF annotation and GRanges
+#'         regions object. 
 #' 
 annotate <- function(getAnno, mygff, mygr){
+    chr <- NULL
+    coord <- NULL
+    anno.str <- NULL
     lapply(getAnno, function(x){
         idx <- which(elementMetadata(mygff)[,"type"] == x)
         mygff_subset <- mygff[idx,]
@@ -110,19 +109,25 @@ annotate <- function(getAnno, mygff, mygr){
 }
 
 #-----------------------------------------------------------------------------
-#' ff
-#' @param d
-#' @param annotation Annotation terms used to annotate DMRs
-#' @param tmp.name
-#' @param out.dir
+#' Output annotations overlapping regions and DMR count table as txt files
+#' @param d Data frame from annotate function containing overlapping 
+#'          annotations. (DataFrame object)
+#' @param gr GenomicRanges object with set of regions/DMRs 
+#'           (GenomicRanges object)
+#' @param annotation Annotation terms used to annotate DMRs. (char)
+#' @param tmp.name Filename generated in annotation function. (char) 
+#' @param out.dir Path to the output directory. (char)
 #' @import magrittr
 #' @importFrom  data.table fwrite uniqueN
 #' @importFrom  dplyr group_by summarize
 #' @importFrom  stats start end
+#' @return Annotation and DMR counts txt files in the output directory.
 #' 
 writeTxtAnnotations <- function(
-        d, gr, annotation, tmp.name, out.dir, anno.list, final.df)
+        d, gr, annotation, tmp.name, out.dir)
 {
+    anno.list <- list()
+    final.df <- list()
     out <- d %>%
         group_by(seqnames, start, end) %>%
         summarize(
@@ -162,23 +167,26 @@ writeTxtAnnotations <- function(
 }
 
 #-----------------------------------------------------------------------------
-#' Output annotated DMRs in text and gff3 format, and DMR count table.
+#' Output annotated DMRs in text and gff3 format, and DMR count table
 #' @inheritParams gff3.in
 #' @inheritParams gff3.out
 #' @inheritParams annotate
-#' @param out.dir Output directory
-#' @param annotation Annotation terms used to annotate DMRs
-#' @param gff.files Multiple gff3 files can be supplied as a vector
-#' @param gff3.out A logical specifying whether output annotated files in gff3
-#' @param input.dir Input directory containing filtered DMR matrix/matrices
+#' @inheritParams writeTxtAnnotations
+#' @param annotation Annotation terms used to annotate DMRs. (char)
+#' @param gff.files Paths to the gff3 files can be supplied as a vector; 
+#'                  corresponding to the annotation terms. (char)
+#' @param if.gff3 A logical specifying whether output annotated files in 
+#'                gff3. (logical)
+#' @param input.dir Path to the input directory containing (non)/filtered 
+#'                  DMR matrix/matrices. (char)
+#' @param out.dir Path to the output directory. (char)
 #' @importFrom GenomicRanges GRanges
 #' @importFrom IRanges IRanges
 #' @importFrom data.table fread rbindlist
+#' @return Output files containing annotated DMRs and DMR counts table
 #' @export
-#' @return output files containing annotated DMRs and DMR counts table
 #' 
 annotateDMRs <- function(annotation, gff.files, if.gff3, input.dir, out.dir) {
-    anno.list <- list(); final.df <- list()
     file.list <- list.files(input.dir, pattern="*.txt", full.names = TRUE)
     for (i in seq_along(file.list)){
         message("Running file ", file.list[i])
@@ -199,8 +207,7 @@ annotateDMRs <- function(annotation, gff.files, if.gff3, input.dir, out.dir) {
             if (nrow(d) != 0) {
                 writeTxtAnnotations(
                     d = d, gr = gr, annotation = annotation, 
-                    tmp.name = tmp.name, out.dir = out.dir, 
-                    anno.list = anno.list, final.df = final.df)
+                    tmp.name = tmp.name, out.dir = out.dir)
             }
         }
     }

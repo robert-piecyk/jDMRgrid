@@ -1,4 +1,14 @@
-# jDMRgrid 0.2.1
+# jDMRgrid 0.2.3
+
+Changes in version 0.2.3 (2023-10-24)
+* New form of samplefile: samplelist (DataFrame needs to supplied directly)
+* Meeting BiocCheck and R CMD check requirements
+* Updated manuals for functions and intermediate datasets to run examples for single files
+* Updated vignette
+* Functions and package meeting good coding practices
+* Faster filterDMRmatrix and findinig context specific DMRs
+* Errors were corrected
+
 
 Changes in version 0.2.2 (2023-10-19)
 * KISS & DRY code implementation

@@ -1,17 +1,16 @@
-#'
-#' @param filepath
-#' @param colm
-#' @param include.intermediate
-#' @param mincov
-#' @param nCytosines
+#------------------------------------------------------------------------------
+#' Merge state calls (col6) and rc.meth.lvl  (col7) for all samples into  the 
+#' single DataFrame; make a list of these two dataframes
+#' @param filepath Paths to the methylome outputs for single samples. (char)
+#' @param colm Column indices to be included in the final dataset. (num)
+#' @param include.intermediate Logical if intermediate calls should be used;
+#'                             default as FALSE. (logical)
 #' @import magrittr
 #' @importFrom data.table fread
 #' @importFrom dplyr inner_join
-#'
-
-# This function will merge (column 6) state calls and (column 7)
-# rc.meth.lvl from all samples into one dataframe
-# makes list of 2 dataframes
+#' @return List of two data frames (for state calls and rc.meth.lvl) with
+#'         merged columns
+#' 
 merge_cols <- function(filepath, colm, include.intermediate) {
     mylist <- list()
     for (l in seq_along(colm)){
@@ -37,18 +36,36 @@ merge_cols <- function(filepath, colm, include.intermediate) {
     return(mylist)
 }
 
-write.out <- function(out.df, data.dir, out.name, contexts){
+#------------------------------------------------------------------------------
+#' Write DMR matrix data as txt file
+#' @param out.df Output DataFrame with the dataset to be saved as txt file.
+#'               (DataFrame object)
+#' @param data.dir Path to the output directory. (char)
+#' @param out.name Name of the file to be saved. (char)
+#' @param contexts Methylation context; 'CG' or 'CHG' or 'CHH' . (char)
+#' @importFrom data.table fwrite
+#' @return DMR matrix saved in the output directory for the given context and
+#'         data type given in the out.name
+#' 
+write.out <- function(out.df, data.dir, out.name, contexts) {
     fwrite(x=out.df, file=paste0(
-        data.dir,"/",contexts,"_",out.name,".txt"
-        ),quote=FALSE, row.names=FALSE, col.names=TRUE, sep="\t")
+        data.dir, "/", contexts,"_", out.name, ".txt"), quote=FALSE, 
+        row.names=FALSE, col.names=TRUE, sep="\t")
 }
 
+#------------------------------------------------------------------------------
 #' Builds a combined matrix for a given dataset (s-c, rcmthlvl or postMax) 
-#' @param data Dataset
-#' @param data.type Character (postMax, StateCalls or rcMethlvl)
-#' @param flist List of the output matrices for a given context
-#' @param out.dir Output directory to save dataset
-#' @param context Methylation context (CG, CHG or CHH)
+#' @inheritParams write.out
+#' @param data DataFrame with the dataset to be saved as txt file.
+#'             (DataFrame object)
+#' @param data.type Type of the data; "postMax" or "StateCalls" or "rcMethlvl"
+#'                  (char)
+#' @param flist List of the full.path.MethReg to be saved as the columns; 
+#'              gained from the prepareFlist function. (DataFrame object)
+#' @param out.dir Path to the output directory. (char)
+#' @param context Methylation context "CG" or "CHG" or "CHH". (char)
+#' @return Saved DMR matrix in output directory for a given context and type
+#' 
 writeDMRmatrix <- function(data, data.type, flist, out.dir, context) {
     for (a in 4:ncol(data)) {
         for (n in seq_along(flist$name)) {
@@ -65,14 +82,19 @@ writeDMRmatrix <- function(data, data.type, flist, out.dir, context) {
     write.out(data, out.dir, data.type, context)
 }
 
-#' Prepare flist out of names 
-#' @param context Methylation context (CG, CHG or CHH)
-#' @param extractflist All files in the input directory
-#' @param samplelist Sample files in the input directory
+#------------------------------------------------------------------------------
+#' Extract filenames and match them to the methylation contexts
+#' @param context Methylation context; "CG" or "CHG" or "CHH". (char)
+#' @param extractflist Vector with the files 
+#'                     listed in the input directory. (char)
+#' @param samplelist DataFrame object containing information about
+#'                   file, sample, replicate and group. (DataFrame object)
 #' @importFrom data.table rbindlist
+#' @return Path to the methylome input files matching a given context
+#' 
 prepareFlist <- function(context, extractflist, samplelist) {
     mynames <- gsub(
-        paste0("_", context,".txt$"), "",basename(extractflist))
+        paste0("_", context,".txt$"), "", basename(extractflist))
     selectlist <- list()
     message("Extracting filenames and matching them...")
     for (a1 in seq_along(mynames)){
@@ -95,24 +117,33 @@ prepareFlist <- function(context, extractflist, samplelist) {
     return(flist)
 }
 
+#------------------------------------------------------------------------------
 #' Builds a DMR matrix for all samples
 #' This function generates a binary matrix, a matrix of
 #' recalibrated methylation levels and posterior probabilities for all samples.
-#' @param context Vector of cytosine contexts. (character vector)
-#' @param samplefiles Path to the text file. (character)
-#' @param include.intermediate A logical if intermediate calls should be used.
-#' @param input.dir Path to the methylome calls. (character)
-#' @param out.dir Path to output directory. (character)
+#' @inheritParams prepareFlist
+#' @inheritParams merge_cols
+#' @inheritParams writeDMRmatrix
+#' @param context Vector of cytosine contexts; default c('CG','CHG','CHH'). 
+#'                (char)
+#' @param postMax.out Logical if DMR matrix with postMax probabilities
+#'                    should be output; default as FALSE. (logical)
+#' @param samplelist DataFrame object containing information about
+#'                   file, sample, replicate and group. (DataFrame object)
+#' @param input.dir Path to the input directory with methylome calls
+#'                  after jDMRgrid function. (char)
+#' @param out.dir Path to the output directory. (char)
+#' @param include.intermediate Logical if intermediate calls should be used;
+#'                             default as FALSE. (logical)
 #' @import magrittr
-#' @importFrom data.table fread
-#' @importFrom data.table fwrite
-#' @importFrom data.table rbindlist
+#' @importFrom data.table fread fwrite rbindlist
+#' @return Saved state-calls, rc-methylation and postMax DMR matrices
+#'         as txt files.
 #' @export
 makeDMRmatrix <- function(
-        contexts=c("CG","CHG","CHH"), postMax.out=FALSE, samplefiles,
+        contexts=c("CG","CHG","CHH"), postMax.out=FALSE, samplelist,
         input.dir, out.dir, include.intermediate=FALSE) 
     {
-    samplelist <- fread(samplefiles, header=TRUE) # Read the sample file 
     for (j in  seq_along(contexts)){
         # list all files in the input directory
         extractflist <- list.files(
@@ -143,9 +174,10 @@ makeDMRmatrix <- function(
                 data = mydf[[3]], data.type = "rcMethlvl", flist = flist, 
                 out.dir = out.dir, context = contexts[j])
             # list containing postMax
-            writeDMRmatrix(
-                data = mydf[[3]], data.type = "rcMethlvl", flist = flist, 
-                out.dir = out.dir, context = contexts[j])
+            if (postMax.out == TRUE) {
+                writeDMRmatrix(
+                    data = mydf[[1]], data.type = "postMax", flist = flist, 
+                    out.dir = out.dir, context = contexts[j])}
             message("Done!")
         } else{
             message("Files for context ", contexts[j],  " do not exist!")

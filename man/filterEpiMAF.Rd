@@ -2,39 +2,50 @@
 \alias{filterEpiMAF}
 \title{filter DMR matrix according to the minor epi-allele frequency}
 \usage{
-filterEpiMAF(
-    epiMAF.cutoff = NULL, replicate.consensus = NULL, data.dir, samplefiles,
-    if.mergingBins = TRUE)
+filterEpiMAF(status.collect, rc.methlevel.collect, epiMAF)
 }
 \arguments{
-\item{epiMAF.cutoff}{Numeric threshold to filter for minor epi-allele 
+\item{status.collect}{Data frame containing state calls for a given sample. 
+(DataFrame object)}
+
+\item{rc.methlevel.collect}{Data frame containing methylation levels for 
+a given sample. (DataFrame object)}
+
+\item{epiMAF}{Numeric threshold to filter for minor epi-allele 
 frequency. Applicable for population level data. By default this option is 
 set to NULL. (NULL or numeric value between 0 and 1)}
-
-\item{replicate.consensus}{Numeric threshold as the percentage of concordance 
-in methylation states among samples with multiple replicates. 
-Applicable for control/treatment data. By default this option is set to NULL. 
-(NULL or numeric value between 0 and 1)}
-
-\item{data.dir}{Path to the directory containing DMR matrix files. 
-Looks for files with suffix("_StateCalls.txt" and "_rcMethlvl.txt"). 
-(character)}
-
-\item{samplefiles}{Path to the text file containing path to samples 
-and sample names. For control/treatment data an 
-additional column specifying the replicates is required. (character)}
-
-\item{if.mergingBins}{Logical argument if merging consecutive bins 
-having the same stateCalls should be performed. 
-By default it is set to TRUE. (logical)}
 }
 \value{
-output files containing filtered matrices of state calls, methylation levels 
-and optionally postMax probabilities.
+list of data frames for rc-methylation level and state-calls using 
+minor epi-allele frequency criterion.
 }
 \description{
-Filters non-polymorphic patterns by default.
+Filter for minor epi-allele frequency in population-based data. 
+Example: Let's have 4 regions to be filtered having the following frequency of 
+the state calls among all sample (M = Meth, I = Intermediate, U = Unmeth)
+Region 1: 1M, 2I, 7U
+Region 2: 3M, 7U
+Region 3: 2M 4I 4U
+Region 4: 5M 5U
+
+Let's calculate the frequency of the state call which occurs least often:
+Region 1: Meth (10%)
+Region 2: Meth (30%)
+Region 3: Meth (20%)
+Region 4: Meth (50%)
+
+If the epiMAF cutoff is set to 0.33, region 1 and region 2 would be removed
+from the final dataset.
 }
 \examples{
-TBA
+list.out <- filterEpiMAF(
+    status.collect = data.table::fread(
+        system.file(
+            "extdata", "matrix_population/CG_StateCalls.txt", 
+            package="jDMRgrid")), 
+    rc.methlevel.collect = data.table::fread(
+        system.file(
+            "extdata", "matrix_population/CG_rcMethlvl.txt", 
+            package="jDMRgrid")), 
+    epiMAF = 0.3)
 }

@@ -19,10 +19,14 @@ geometry: margin=0.5in
 urlcolor: blue
 vignette: |
     %\VignetteIndexEntry{jDMRgrid} 
-    %\VignetteEngine{knitr::knitr} 
     %\VignetteEncoding{UTF-8}
     %\usepackage[utf8]{inputenc}
+    %\VignetteEngine{knitr::knitr} 
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
+
 ```{r setup, include = FALSE}
 options(width=120)
 knitr::opts_chunk$set(
@@ -38,146 +42,144 @@ knitr::opts_chunk$set(
 \newpage
 
 ```{r eval=TRUE, include=FALSE}
-library(data.table)
 library(jDMRgrid)
+library(data.table)
 ```
 
 \section{Input files}
 
-For generation of region-level calls, jDMRgrid requires the following inputs.
+For generation of region-level calls, jDMRgrid requires the following
+inputs.
 
-## Methimpute files: 
+## Methimpute files:
 
-Base-level methylome outputs (generated using the R package "Methimpute") 
+Base-level methylome outputs (generated using the R package
+"Methimpute")
 
 ## A metadata file containing description about samples
-For population data-sets without replicates, listfiles.fn should have the 
-structure below.
+
+For population data-sets without replicates, listfiles.fn should have
+the structure below.
 
 \setlength{\leftskip}{1cm}
 
 **file**: full PATH of file.
-
 **sample**: a sample name
 
 \setlength{\leftskip}{0pt}
 
-```{r}
-samplefile1 <- system.file("extdata", "listFiles1.fn", package="jDMR")
-fread(samplefile1, header = TRUE)
+```{r, include=TRUE}
+load(system.file("data", "listFiles1.RData", package="jDMRgrid"))
+listFiles1$file <- system.file("extdata", listFiles1$file,  package="jDMRgrid")
+listFiles1
 ```
 
-For pairwise control-treatment data-sets with replicates,additional columns 
-"replicate" and "group" should be provided. See structure below.
+For pairwise control-treatment data-sets with replicates,additional
+columns "replicate" and "group" should be provided. See structure below.
 
 \setlength{\leftskip}{1cm}
 
 **file**: full PATH of file
-
 **sample**: a sample name
-
 **replicate**: label for replicates
-
 **group**: label for control and treatment groups
 
 \setlength{\leftskip}{0pt}
 
-```{r}
-samplefile2 <- system.file("extdata", "listFiles2.fn", package="jDMRgrid")
-fread(samplefile2, header = TRUE)
+```{r, include=TRUE}
+load(system.file("data", "listFiles2.RData", package="jDMRgrid"))
+listFiles2$file <- system.file("extdata", listFiles2$file,  package="jDMRgrid")
+listFiles2
 ```
-
-
 
 ```{r eval=TRUE, include=FALSE}
-#out.dir <- paste0("/myfolder/results/", Sys.getenv("LOGNAME"),"/")
-out.dir.pop <- "/home/robert/jDMRgrid_test/folder_population"
-out.dir.rep <- "/home/robert/jDMRgrid_test/folder_replicate"
+system2(command = "/bin/mkdir", args = "~/folder_population")
+system2(command = "/bin/mkdir", args = "~/folder_replicate")
+system2(command = "/bin/mkdir", args = "~/folder_population/grid")
+system2(command = "/bin/mkdir", args = "~/folder_replicate/grid")
+system2(command = "/bin/mkdir", args = "~/folder_population/matrix")
+system2(command = "/bin/mkdir", args = "~/folder_replicate/matrix")
+system2(command = "/bin/mkdir", args = "~/folder_population/context_DMRs")
+system2(command = "/bin/mkdir", args = "~/folder_replicate/context_DMRs")
+system2(command = "/bin/mkdir", args = "~/folder_population/annotate_DMRs")
+system2(command = "/bin/mkdir", args = "~/folder_replicate/annotate_DMRs")
 ```
 
+```{=tex}
 \newpage
-\section{Step 1: Generate cytosine region calls from genome}
-
-jDMR detects DMRs using two approaches a) finding cytosine clusters in the 
-genome (section 2.1) b) using a binning approach (section 2.2). 
-You can use either of the methods to obtain the region calls. 
-The remaining steps, makeDMRmatrix, filterDMRmatrix, annotateDMRs 
-are the same for both methods.
+\section{Generate cytosine region calls from genome}
+```
+jDMR detects DMRs using two approaches a) finding cytosine clusters in
+the genome (section 2.1) b) using a binning approach (section 2.2). You
+can use either of the methods to obtain the region calls. The remaining
+steps, makeDMRmatrix, filterDMRmatrix, annotateDMRs are the same for
+both methods.
 
 ## Run jDMRgrid on a binned genome
 
-This function uses a grid approach to bin the genome into equal sized bins. 
-User specifies the window and step size as numeric values. 
+This function uses a grid approach to bin the genome into equal sized
+bins. User specifies the window and step size as numeric values.
 
 \setlength{\leftskip}{1cm}
+
 **out.dir**: PATH to output directory.
 
 **window**: NUMERIC VALUE specifying bin size.
 
-**step**: NUMERIC VALUE specifying step size. If bin and step size are equal, 
-we are utilizing non-sliding window approach.
+**step**: NUMERIC VALUE specifying step size. If bin and step size are
+equal, we are utilizing non-sliding window approach.
 
-**samplefiles**: PATH to the text file containing path to samples 
-and sample names. 
+**samplelist**: DATAFRAME OBJECT containing information about file,
+sample and replicate. For control/treatment data an additional column
+specifying the replicates is required.
 
-**contexts**: VECTOR or CHARACTER presenting sequence contexts of the cytosine. 
-By default this option is set to c("CG", "CHG", "CHH"). If you want to run for 
-a single context such as CG, set it as "CG".
+**contexts**: VECTOR or CHARACTER presenting sequence contexts of the
+cytosine. By default this option is set to c("CG", "CHG", "CHH"). If you
+want to run for a single context such as CG, set it as "CG".
 
-**min.C**: NUMERIC VALUE specifying percentile threshold based on empirical 
-distribution of the cytosines across bins.
+**min.C**: NUMERIC VALUE specifying percentile threshold based on
+empirical distribution of the cytosines across bins.
 
-**mincov**: NUMERIC VALUE specifying minimum read coverage over cytosines. 
-By default this option is set as 0. 
+**mincov**: NUMERIC VALUE specifying minimum read coverage over
+cytosines. By default this option is set as 0.
 
-**include.intermediate**: LOGICAL specifying whether or not the intermediate 
-component should be included in the HMM model. 
-By default this option is set as FALSE.
+**include.intermediate**: LOGICAL specifying whether or not the
+intermediate component should be included in the HMM model. By default
+this option is set as FALSE.
 
-**runName**: CHARACTER as the name of the operation. By default this option 
-is set to 'GridGenome'.
+**runName**: CHARACTER as the name of the operation. By default this
+option is set to 'GridGenome'.
 
-**parallelApply**: LOGICAL specifying if future.apply package should be used
-to use parallel operation. By default this option is set to FALSE.
+**parallelApply**: LOGICAL specifying if future.apply package should be
+used to use parallel operation. By default this option is set to FALSE.
 
-**numCores**: NUMERIC VALUE specifying number of cores to perform parallel 
-operation using foreach loop. By default this option is set to NULL.
-
+**numCores**: NUMERIC VALUE specifying number of cores to perform
+parallel operation using foreach loop. By default this option is set to
+NULL.
 
 \setlength{\leftskip}{0pt}
 
 ```{r eval=FALSE, include=TRUE}
 library(jDMRgrid)
-home_dir <- getwd()
-out.dir.pop <- "/home/robert/jDMRgrid_test/folder_population"
-out.dir.rep <- "/home/robert/jDMRgrid_test/folder_replicate"
-samplefile <- system.file("extdata","listFiles2.fn", package="jDMRgrid")
-
 runjDMRgrid(
-    out.dir = paste0(out.dir.pop, '/grid'), window = 200, step = 50, 
-    samplefiles = system.file("extdata", "listFiles1.fn", package="jDMRgrid"),
-    contexts = c("CG", "CHG", "CHH"), min.C = 10, mincov = 0, 
-    include.intermediate = FALSE, runName = "Arabidopsis", 
-    parallelApply = FALSE, #future_apply option enabled
-    numCores = NULL) #foreach loop option disabled
-
-runjDMRgrid(
-    out.dir = paste0(out.dir.rep, '/grid'), window = 200, step = 50,
-    samplefiles = system.file("extdata", "listFiles2.fn", package="jDMRgrid"),
+    out.dir = '~/folder_population/grid',
+    window = 200, step = 50, samplelist = listFiles1,
     contexts = c("CG", "CHG", "CHH"), min.C = 10, mincov = 0,
-    include.intermediate = TRUE, #include intermediate calls enabled
-    runName = "Arabidopsis", parallelApply = FALSE, # future_apply disabled
-    numCores = NULL) #foreach disabled
+    include.intermediate = TRUE, runName = "Arabidopsis")
+runjDMRgrid(
+    out.dir = '~/folder_replicate/grid',
+    window = 200, step = 50, samplelist = listFiles2,
+    contexts = c("CG", "CHG", "CHH"), min.C = 10, mincov = 0,
+    include.intermediate = TRUE, runName = "Arabidopsis")
 ```
 
 ### Output files of jDMR Grid approach
 
-Region files containing state calls and methylation levels will be generated 
-for each sample and for each context.
+Region files containing state calls and methylation levels will be
+generated for each sample and for each context.
 
-```{r eval=TRUE, include=FALSE}
-
-jDMR.out <- fread(paste0(out.dir.pop, '/grid/methimpute_p1.csv_CG.txt'))
+```{r eval=TRUE, include=TRUE}
+jDMR.out <- fread('~/folder_replicate/grid/methimpute_p1_CG.txt')
 ```
 
 ```{r echo=FALSE}
@@ -194,151 +196,163 @@ head(jDMR.out)
 
 **status** : Methylation status
 
-**rc.meth.lvl**: Recalibrated methylation level calculated from the posteriors 
-and fitted parameters
+**rc.meth.lvl**: Recalibrated methylation level calculated from the
+posteriors and fitted parameters
 
 \setlength{\leftskip}{0pt}
 
+```{=tex}
 \newpage
-\section{Step 2: Generate DMR matrix}
-
+\section{Generate DMR matrix}
+```
 ## Run "makeDMRmatrix"
 
-This function generates a DMR matrix of state calls, rc.meth.lvls and posterior 
-probabilities for all samples in one dataframe.
+This function generates a DMR matrix of state calls, rc.meth.lvls and
+posterior probabilities for all samples in one dataframe.
 
 \setlength{\leftskip}{1cm}
-**samplefiles**: PATH to file containing description about the samples
+
+**samplelist**: DATAFRAME OBJECT containing information about file,
+sample and replicate. For control/treatment data an additional column
+specifying the replicates is required.
 
 **input.dir**: PATH to directory containing region files.
 
 **out.dir**: PATH to output directory.
 
-**contexts**: sequence contexts of the cytosine. By default this option is set 
-to c("CG", "CHG", "CHH"). 
-If you want to run for a single context such as CG, set it as "CG".
+**contexts**: sequence contexts of the cytosine. By default this option
+is set to c("CG", "CHG", "CHH"). If you want to run for a single context
+such as CG, set it as "CG".
 
-**postMax.out**: By default this option is set as FALSE. You can set it to TRUE 
-if you want to output the DMR matrix containing posterior probabilities for 
-the status call of each region.
+**postMax.out**: By default this option is set as FALSE. You can set it
+to TRUE if you want to output the DMR matrix containing posterior
+probabilities for the status call of each region.
 
 \setlength{\leftskip}{0pt}
 
 ```{r eval=FALSE, include=TRUE}
-
 makeDMRmatrix(
     contexts = c("CG", "CHG", "CHH"), postMax.out = TRUE, 
-    samplefiles = system.file("extdata", "listFiles1.fn", package="jDMRgrid"),
-    input.dir = paste0(out.dir.pop, '/grid'), 
-    out.dir = paste0(out.dir.pop, '/matrix'), include.intermediate = FALSE)
+    samplelist = listFiles1,
+    input.dir = '~/folder_population/grid', 
+    out.dir = '~/folder_population/matrix', include.intermediate = FALSE)
 
 makeDMRmatrix(
     contexts = c("CG", "CHG", "CHH"), postMax.out = TRUE,
-    samplefiles = system.file("extdata", "listFiles2.fn", package="jDMRgrid"),
-    input.dir = paste0(out.dir.rep, '/grid'),
-    out.dir = paste0(out.dir.rep, '/matrix'), include.intermediate = FALSE)
-
+    samplelist = listFiles2,
+    input.dir = '~/folder_replicate/grid',
+    out.dir = '~/folder_replicate/matrix', include.intermediate = FALSE)
 ```
 
 ## Output files of DMRmatrix function
-*"CG_StateCalls.txt" has the following structure. "0" in the output matrix*
-*denotes "Unmethylated" and "1" stands for "Methylated".*
+
+*"CG_StateCalls.txt" has the following structure. "0" in the output
+matrix* *denotes "Unmethylated" and "1" stands for "Methylated".*
 
 ```{r eval=TRUE, include=TRUE}
-statecalls <- fread(
-    paste0(out.dir.pop, "/matrix/CG_StateCalls.txt" , sep=""), header=TRUE)
+statecalls <- fread("~/folder_replicate/matrix/CG_StateCalls.txt", header=TRUE)
+```
+
+```{r echo=FALSE}
 head(statecalls)
 ```
 
-*"CG_rcMethlvl.txt" has the following structure. The output matrix contains * 
-*recalibrated methylation levels for each sample and for the specific region.*
+*"CG_rcMethlvl.txt" has the following structure. The output matrix
+contains* *recalibrated methylation levels for each sample and for the
+specific region.*
 
 ```{r eval=TRUE, include=TRUE}
-rcmethlvls <- fread(
-    paste0(out.dir.pop, "/matrix/CG_rcMethlvl.txt" , sep=""), header = TRUE)
+rcmethlvls <- fread("~/folder_replicate/matrix/CG_rcMethlvl.txt", header=TRUE)
+```
+
+```{r echo=FALSE}
 head(rcmethlvls)
 ```
 
-*"CG_postMax.txt" has the following structure. The output matrix contains*
-*posterior probabilities for each sample and for the specific region.*
+*"CG_postMax.txt" has the following structure. The output matrix
+contains* *posterior probabilities for each sample and for the specific
+region.*
 
 ```{r eval=TRUE, include=TRUE}
-postMax <- fread(
-    paste0(out.dir.pop, "/matrix/CG_postMax.txt" , sep=""), header = TRUE)
+postMax <- fread("~/folder_replicate/matrix/CG_postMax.txt", header=TRUE)
+```
+
+```{r echo=FALSE}
 head(postMax)
 ```
 
-## Split DMR matrix into pairwise groups (only applicable for datasets with 
-## control- treatments)
-Ignore this step if you are running jDMR on population data without replicates
+## Split DMR matrix into pairwise groups
+
+Ignore this step if you are running jDMR on population data without
+replicates
 
 \setlength{\leftskip}{1cm}
-**samplefiles**: PATH to file containing description about the samples
+
+**samplelist**: DATAFRAME OBJECT containing information about file,
+sample and replicate. For control/treatment data an additional column
+specifying the replicates is required.
 
 **input.dir**: PATH to directory containing region files.
 
 **out.dir**: PATH to output directory.
 
-**contexts**: sequence contexts of the cytosine. By default this option is 
-set to c("CG", "CHG", "CHH"). If you want to run for a single context 
+**contexts**: sequence contexts of the cytosine. By default this option
+is set to c("CG", "CHG", "CHH"). If you want to run for a single context
 such as CG, set it as "CG".
 
-**postMax.out**: by default this option is set to FALSE. If you want to 
+**postMax.out**: by default this option is set to FALSE. If you want to
 output the matrix containing posterior probabilities set it to TRUE.
 
 \setlength{\leftskip}{0pt}
 
 ```{r eval=FALSE, include=TRUE}
-split.groups(
-    samplefiles = system.file("extdata", "listFiles2.fn", package="jDMRgrid"),
-    input.dir = paste0(out.dir.rep, "/matrix"),
-    out.dir = paste0(out.dir.rep, "/matrix"))
+splitGroups(
+    samplelist = listFiles2,
+    input.dir = '~/folder_replicate/matrix',
+    out.dir = '~/folder_replicate/matrix')
 ```
 
+```{=tex}
 \newpage
-\section{Step 3: Filter DMR matrix}
-
-## Filter the DMR matrix 
+\section{Filter DMR matrix}
+```
+## Filter the DMR matrix
 
 This function filters the DMR matrix for non-polymorphic patterns.
 
 \setlength{\leftskip}{1cm}
-                            
+
 **data.dir**: PATH to folder containing DMR matrix
 
-**epiMAF.cutoff**: Applicable for calling calling population DMRs. 
-This option can be used to filter for Minor Epi-Allele frequency as 
-specified by user. By default, this option is set to NULL. 
+**epiMAF.cutoff**: Applicable for calling calling population DMRs. This
+option can be used to filter for Minor Epi-Allele frequency as specified
+by user. By default, this option is set to NULL.
 
-**replicate.consensus** : Applicable for control-treatment data-sets 
-with replicates. Users can specify the percentage of concordance in 
-methylation states in samples with multiple replicates. 
-For datasets with just 2 replicates, \textit{replicate.consensus} 
-should be set as 1 (means 100% concordance). 
-By default, this option is set to NULL.
+**replicate.consensus** : Applicable for control-treatment data-sets
+with replicates. Users can specify the percentage of concordance in
+methylation states in samples with multiple replicates. For datasets
+with just 2 replicates, \textit{replicate.consensus} should be set as 1
+(means 100% concordance). By default, this option is set to NULL.
 
-**samplefiles** : Path to the text file containing path to samples and 
-sample names. For control/treatment data an additional column specifying 
-the replicates is required.
+**samplelist**: DATAFRAME OBJECT containing information about file,
+sample and replicate. For control/treatment data an additional column
+specifying the replicates is required.
 
-**if.mergingBins** : Logical argument if merging consecutive bins having the 
-same stateCalls should be performed. By default set to TRUE. (logical)
+**if.mergingBins** : Logical argument if merging consecutive bins having
+the same stateCalls should be performed. By default set to TRUE.
+(logical)
 
 \setlength{\leftskip}{0pt}
-                            
-```{r eval=FALSE, include=TRUE}
 
+```{r eval=FALSE, include=TRUE, echo=FALSE}
 filterDMRmatrix(
     epiMAF.cutoff = 0.33, replicate.consensus = NULL, 
-    data.dir = paste0(out.dir.pop, "/matrix"), samplefiles = system.file(
-        "extdata", "listFiles1.fn", package="jDMRgrid"), if.mergingBins = FALSE)
-
+    data.dir = "~/folder_population/matrix", 
+    samplelist = listFiles1, if.mergingBins = FALSE)
 filterDMRmatrix(
     epiMAF.cutoff = NULL, replicate.consensus = 0.8, 
-    data.dir = paste0(out.dir.rep, "/matrix"), samplefiles = system.file(
-        "extdata", "listFiles2.fn", package="jDMRgrid"), if.mergingBins = FALSE)
-
-
+    data.dir = "~/folder_replicate/matrix", 
+    samplelist = listFiles2, if.mergingBins = FALSE)
 ```
 
 ## Filtered Output
@@ -347,98 +361,110 @@ filterDMRmatrix(
 
 ```{r eval=TRUE, include=TRUE}
 statecallsFiltered <- fread(
-    paste0(out.dir.pop,"/matrix/CG_StateCalls-filtered.txt",sep=""),header=TRUE)
+    "~/folder_population/matrix/CG_StateCalls-filtered.txt", header=TRUE)
+```
+
+```{r echo=FALSE}
 head(statecallsFiltered)
 ```
+If "rc.methlvl.out" option is set to TRUE a filtered matrix with
+averaged methylation levels in generated.
 
-If "rc.methlvl.out" option is set to TRUE a filtered matrix with averaged 
-methylation levels in generated.
 ```{r eval=TRUE, include=TRUE}
 rcmethlvlFiltered <- fread(
-    paste0(out.dir.pop,"/matrix/CG_rcMethlvl-filtered.txt",sep=""),header=TRUE)
+    "~/folder_population/matrix/CG_rcMethlvl-filtered.txt", header=TRUE)
+```
+
+```{r echo=FALSE}
 head(rcmethlvlFiltered)
 ```
-\newpage
-\section{Step 4: Search for context-specific and annotate DMRs}
 
+```{=tex}
+\newpage
+\section{Search for context-specific and annotate DMRs}
+```
 ## Output context specific DMRs
 
-Output DMRs specific for contexts i.e CG-only, CHG-only, CHH-only, 
+Output DMRs specific for contexts i.e CG-only, CHG-only, CHH-only,
 non-CG and multi-context DMRs using the *StateCalls-filtered.txt files
-(if variable ifFiltered equals to TRUE) or *StateCalls.txt files
-(if variable ifFiltered equals to FALSE, as default). 
+(if variable ifFiltered equals to TRUE) or* StateCalls.txt files (if
+variable ifFiltered equals to FALSE, as default).
 
 ```{r eval=FALSE, include=TRUE}
-
 context.specific.DMRs(
-    samplefiles = system.file("extdata", "listFiles1.fn", package="jDMRgrid"),
-    output.dir = paste0(out.dir.pop, "/context_DMRs"),
-    input.dir = paste0(out.dir.pop, "/matrix"), if.filtered = FALSE)
-
+    samplelist = listFiles1,
+    output.dir = "~/folder_population/context_DMRs",
+    input.dir = "~/folder_population/matrix", if.filtered = FALSE)
 context.specific.DMRs(
-    samplefiles = system.file("extdata", "listFiles2.fn", package="jDMRgrid"),
-    output.dir = paste0(out.dir.rep, "/context_DMRs"),
-    input.dir = paste0(out.dir.rep, "/matrix"), if.filtered = FALSE)
-```                      
-
+    samplelist = listFiles2,
+    output.dir = "~/folder_replicate/context_DMRs",
+    input.dir = "~/folder_replicate/matrix", if.filtered = FALSE)
+```
 
 ## Annotate DMRs
 
-This function annotates the lists of DMRs. Any file(.txt) containing 3 columns 
-(chr, start, stop) can be annotated using the annotateDMRs function. 
-Please move all  files to be annotated to a separate folder and set the full 
-PATH to the "input.dir" option.
+This function annotates the lists of DMRs. Any file(.txt) containing 3
+columns (chr, start, stop) can be annotated using the annotateDMRs
+function. Please move all files to be annotated to a separate folder and
+set the full PATH to the "input.dir" option.
 
 \setlength{\leftskip}{1cm}
 
-**gff.files**: Multiple gff3 annotation files can be supplied as a vector 
+**gff.files**: Multiple gff3 annotation files can be supplied as a
+vector
 
 **annotation**: specify annotation categories
 
-**input.dir**: path to folder containing only files to be annotated. 
-Any file containing 3 columns (chr, start, stop) can be annotated 
-using the annotateDMRs function.
+**input.dir**: path to folder containing only files to be annotated. Any
+file containing 3 columns (chr, start, stop) can be annotated using the
+annotateDMRs function.
 
 **if.gff3**: whether to output annotated files in gff3 format
 
 **out.dir**: path to output folder
 
 \setlength{\leftskip}{0pt}
-In the following example, I will annotate the files generated in section 4.3
+
+In the following example, I will annotate the files generated in section
+4.3
 
 ```{r eval=FALSE, include=TRUE}
-
-gff.file_promoters <- "~/jDMRgrid/jDMRgrid/toyData/TAIR10_promoters.gff3"
-gff.file_TE <- "~/jDMRgrid/jDMRgrid/toyData/TAIR10_TE.gff3"
-gff.file_genes <- "Z/jDMRgrid/jDMRgrid/toyData/TAIR10.gene.chr1.gff3"
-
-annotateDMRs(
-    gff.files = c(gff.file_promoters, gff.file_TE, gff.file_genes),
-    annotation = c("promoters", "TE", "gene"), #vec containing annotation types
-    input.dir = paste0(out.dir.pop, "/context_DMRs"), if.gff3 = FALSE,
-    out.dir = paste0(out.dir.pop, '/annotate_DMRs'))
+gff.file_promoters <-system.file(
+    "extdata/toyData","TAIR10_promoters.gff3", package="jDMRgrid")
+gff.file_TE <- system.file(
+    "extdata/toyData","TAIR10_TE.gff3", package="jDMRgrid")
 
 annotateDMRs(
-    gff.files = c(gff.file_promoters, gff.file_TE, gff.file_genes),
-    annotation = c("promoters", "TE", "gene"), #vec containing annotation types
-    input.dir = paste0(out.dir.rep, "/context_DMRs"), if.gff3 = FALSE,
-    out.dir = paste0(out.dir.pop, '/annotate_DMRs'))
+    gff.files = c(gff.file_promoters, gff.file_TE),
+    annotation = c("promoters", "TE"),
+    input.dir = "~/folder_population/context_DMRs", if.gff3 = FALSE,
+    out.dir = '~/folder_population/annotate_DMRs')
+
+annotateDMRs(
+    gff.files = c(gff.file_promoters, gff.file_TE),
+    annotation = c("promoters", "TE"),
+    input.dir = "~/folder_replicate/context_DMRs", if.gff3 = FALSE,
+    out.dir = '~/folder_replicate/annotate_DMRs')
 ```
 
 ## Output files after annotation
 
-Mapped files are output in .txt and/or .gff3 format. 
-Addiitonally, a DMR count table is generated. 
+Mapped files are output in .txt and/or .gff3 format. Addiitonally, a DMR
+count table is generated.
 
 ```{r eval=TRUE, include=TRUE}
 DMRcounts <- fread(
-    paste0(out.dir.pop, "/annotate_DMRs/DMR-counts.txt", sep=""), header=TRUE)
-DMRcounts
+    "~/folder_replicate/annotate_DMRs/DMR-counts.txt", header=TRUE)
 ```
 
+```{r echo=FALSE}
+head(DMRcounts)
+```
+
+```{=tex}
 \newpage
 \section{R session info }
-
+```
 ```{r}
 sessionInfo()
 ```
