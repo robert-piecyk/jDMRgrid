@@ -16,7 +16,7 @@ library(devtools)
 devtools::install_github("robert-piecyk/jDMRgrid")
 ```
 ## How to use?
-Please open the [vignette](https://github.com/robert-piecyk/jDMRgrid/blob/main/vignettes/manual.pdf) file.
+Please open the [vignette](https://github.com/robert-piecyk/jDMRgrid/blob/master/vignettes/manual.pdf) file.
 
 ## Contributors
 ##### Robert Piecyk - robert.piecyk@tum.de
