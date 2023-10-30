@@ -245,6 +245,7 @@ makeMethimpute_foreach <- function(
         jk = seq_along(out.samplelist$context), .combine = "c", .packages = c(
             'methimpute'), .export = "jk") %dopar% 
         {
+            message(jk)
             runMethimputeJ(jk)
         }
     stopCluster(cl)
