@@ -157,6 +157,13 @@ used to use parallel operation. By default this option is set to FALSE.
 parallel operation using foreach loop. By default this option is set to
 NULL.
 
+**if.Bismark**: LOGICAL specifying if Bismark inputs (CX reports in txt format
+specificaly) are used in samplelist file. By default this option is set to
+FALSE (methimpute files are used).
+
+**FASTA.file**: PATH to the FASTA file; required if.Bismark paramater is set to
+TRUE. By default this option is set to NULL.
+
 \setlength{\leftskip}{0pt}
 
 ```{r eval=FALSE, include=TRUE}

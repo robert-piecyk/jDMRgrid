@@ -102,15 +102,21 @@ binGenomeLoop <- function(x1, window, step, gr, cyt_gr, contexts, min.C) {
 #' @param out.dir Path to the output directory. (char)
 #' @param runName Character defining the name of the run; 
 #'                default as GridGenome. (char)
+#' @param if.Bismark Logical if Bismark inputs (CX reports in txt format)
+#'                   are used. Default as FALSE. (logical)
+#' @param FASTA.file Path to the FASTA file; required if Bismark outputs are
+#'                   used. Default as NULL. (char)
 #' @importFrom data.table fread rbindlist fwrite
 #' @importFrom stats quantile ecdf
 #' @importFrom IRanges countOverlaps
 #' @importFrom GenomicRanges GRanges
+#' @importFrom Biostrings readDNAStringSet
 #' @return Binned genome saved in the output directory using non/sliding
 #'         window approach.
 #'
 binGenome <- function(
-        methimputefiles, contexts, window, step, min.C, out.dir, runName)
+        methimputefiles, contexts, window, step, min.C, out.dir, runName,
+        if.Bismark, FASTA.file)
 {
     # message about creating grid
     message('Creating grid...')
@@ -124,11 +130,16 @@ binGenome <- function(
         start=all.cyt.pos$pos, width=1),context=all.cyt.pos$context,
         strand=all.cyt.pos$strand)
     # get length of chromosomesś
-    chr.names <- unique(meth.out$seqnames)
-    chr.lengths <- unlist(
-        lapply(chr.names, function(x) max(
-            meth.out$start[meth.out$seqnames == x])))
-    names(chr.lengths) <- chr.names
+    if (if.Bismark == FALSE & FASTA.file == NULL) {
+        chr.names <- unique(meth.out$seqnames)
+        chr.lengths <- unlist(
+            lapply(chr.names, function(x) max(
+                meth.out$start[meth.out$seqnames == x])))
+        names(chr.lengths) <- chr.names
+    } else {
+        fasta.out <- readDNAStringSet(FASTA.file)
+        chr.lengths <- unlist(lapply(fasta.out, length))
+    }
     # create a GRanges object from the chromosome (fasta) start-end positions
     gr <- GRanges(seqnames=names(chr.lengths),ranges=IRanges(
         start=1, end=chr.lengths))
@@ -148,7 +159,6 @@ binGenome <- function(
         collect.bins <- lapply(results, function(x) x$collect.bins)
         message("Exporting regions...")
         lapply(
-            collect.bins, function(x) export.bins(
                 mylist=x, out.dir=out.dir,runName=runName))
         return(list.files(out.dir, pattern=paste0(
                 ".*", runName, ".*\\.Rdata$"), full.names=TRUE))
@@ -168,6 +178,10 @@ binGenome <- function(
 #'                             default as FALSE. (logical)
 #' @param out.dir Path to the output directory. (char)
 #' @param mincov Minimum read coverage; default as 0. (num; between 0 and 1)
+#' @param if.Bismark Logical if Bismark inputs (CX reports in txt format)
+#'                   are used. Default as FALSE. (logical)
+#' @param FASTA.file Path to the FASTA file; required if Bismark outputs are
+#'                   used. Default as NULL. (char)
 #' @import magrittr
 #' @import future
 #' @import future.apply
@@ -176,7 +190,8 @@ binGenome <- function(
 #'         approach
 #' 
 makeMethimpute_future <- function(
-        out.samplelist, merge_list, include.intermediate, out.dir, mincov)
+        out.samplelist, merge_list, include.intermediate, out.dir, mincov,
+        if.Bismark, FASTA.file)
 {
     plan(multisession)
     info_lapply <- future_lapply(
@@ -193,7 +208,8 @@ makeMethimpute_future <- function(
                 fit.name = paste0(
                     basename(out.samplelist$methfn[j]), "_",
                     out.samplelist$context[j]),
-                name = basename(out.samplelist$methfn[j]), mincov = mincov)}, 
+                name = basename(out.samplelist$methfn[j]), mincov = mincov,
+                if.Bismark = if.Bismark, FASTA.file = FASTA.file)}, 
         future.seed = NULL)
 }
 
@@ -211,6 +227,10 @@ makeMethimpute_future <- function(
 #' @param mincov Minimum read coverage; default as 0. (num; between 0 and 1)
 #' @param numCores Number of cores to be used if for_each method should be 
 #'                 performed; default as NULL. (num)
+#' @param if.Bismark Logical if Bismark inputs (CX reports in txt format)
+#'                   are used. Default as FALSE. (logical)
+#' @param FASTA.file Path to the FASTA file; required if Bismark outputs are
+#'                   used. Default as NULL. (char)
 #' @import magrittr
 #' @import foreach
 #' @import doParallel
@@ -221,7 +241,7 @@ makeMethimpute_future <- function(
 #'
 makeMethimpute_foreach <- function(
         out.samplelist, merge_list, include.intermediate, out.dir, mincov, 
-        numCores)
+        numCores, if.Bismark, FASTA.file)
 {
     cl <- makeCluster(numCores)
     registerDoParallel(cl)
@@ -238,7 +258,8 @@ makeMethimpute_foreach <- function(
             fit.name = paste0(
                 basename(out.samplelist$methfn[jj]), "_",
                 out.samplelist$context[jj]),
-            name = basename(out.samplelist$methfn[jj]), mincov = mincov)
+            name = basename(out.samplelist$methfn[jj]), mincov = mincov,
+            if.Bismark = if.Bismark, FASTA.file = FASTA.file)
         return(grid.out)
     }
     jk <- NULL
@@ -263,11 +284,16 @@ makeMethimpute_foreach <- function(
 #'                             default as FALSE. (logical)
 #' @param out.dir Path to the output directory. (char)
 #' @param mincov Minimum read coverage; default as 0. (num; between 0 and 1)
+#' @param if.Bismark Logical if Bismark inputs (CX reports in txt format)
+#'                   are used. Default as FALSE. (logical)
+#' @param FASTA.file Path to the FASTA file; required if Bismark outputs are
+#'                   used. Default as NULL. (char)
 #' @return Methylome for regions taken out grid genome from non/sliding window
 #'         approach
 #' 
 makeMethImpute_normal <- function(
-        out.samplelist, merge_list, include.intermediate, out.dir, mincov)
+        out.samplelist, merge_list, include.intermediate, out.dir, mincov,
+        if.Bismark, FASTA.file)
 {
     info_lapply <- lapply(seq_along(out.samplelist$context), function(jn) {
         refRegion <- list(reg.obs = merge_list[[out.samplelist$id[jn]]])
@@ -283,7 +309,8 @@ makeMethImpute_normal <- function(
             fit.name = paste0(
                 basename(out.samplelist$methfn[jn]), "_",
                 out.samplelist$context[jn]), name = basename(
-                    out.samplelist$methfn[jn]), mincov = mincov)
+                    out.samplelist$methfn[jn]), mincov = mincov, 
+            if.Bismark = if.Bismark, FASTA.file = FASTA.file)
     })
 }
 
@@ -308,6 +335,10 @@ makeMethImpute_normal <- function(
 #'                 performed; default as NULL. (num)
 #' @param parallelApply Logical if futureapply method should be performed;
 #'                      default as FALSE. (logical)
+#' @param if.Bismark Logical if Bismark inputs (CX reports in txt format)
+#'                   are used; default as FALSE. (logical)
+#' @param FASTA.file Path to the FASTA file; required if Bismark outputs are
+#'                   used; default as NULL. (char)
 #' @import magrittr
 #' @import future.apply
 #' @import doParallel
@@ -326,14 +357,15 @@ makeMethImpute_normal <- function(
 runjDMRgrid <- function(
         out.dir, window, step, samplelist, contexts=c('CG','CHG','CHH'), 
         min.C, mincov=0, include.intermediate=FALSE, runName='GridGenome',
-        numCores = NULL, parallelApply = FALSE)
+        numCores = NULL, parallelApply = FALSE, if.Bismark = FALSE
+        FASTA.file = NULL)
 {
     methimputefiles <- samplelist$file
     # Step 1: Bin genome according to the window and step size
     bin.genome.files <- binGenome(
         methimputefiles = methimputefiles, contexts = contexts, 
         window = window, step = step, min.C = min.C, out.dir = out.dir,
-        runName = runName)
+        runName = runName, if.Bismark = if.Bismark, FASTA.file = FASTA.file)
     # Step 2: Extract RData for binned regions and name them as contexts
     bin.select <- lapply(seq_along(contexts), function(x) {
         b <- bin.genome.files[grep(contexts[x], bin.genome.files)]
@@ -350,23 +382,25 @@ runjDMRgrid <- function(
     out.samplelist <- expand.grid(file = samplelist$file, context = contexts)
     out.samplelist <- merge(out.samplelist, data.frame(
         context = names(bin.select), id = seq(1,length(names(bin.select)))))
-    out.samplelist$methfn <- unlist(lapply(
-        seq_along(out.samplelist$file),function(xi) {
-            gsub(".*methylome_|\\.txt|_All.txt$","",out.samplelist$file[xi])}))
+    if (if.Bismark == FALSE) {
+        out.samplelist$methfn<-unlist(lapply(out.samplelist$file,function(xi){
+                gsub(".*methylome_|\\.txt|_All.txt$","",xi)}))} else {
+        out.samplelist$methfn<-unlist(lapply(out.samplelist$file,function(xi){
+                gsub("|\\.txt|.CX_report.txt$","",xi)}))}
     # Step 5: Run makeMethimpute for files in out.samplelist
     if (parallelApply == TRUE) {
         makeMethimpute_future(
-            out.samplelist, merge_list, include.intermediate, out.dir, mincov)
+            out.samplelist, merge_list, include.intermediate, out.dir, mincov,
+            if.Bismark, FASTA.file)
     }
-    if (is.numeric(numCores) == TRUE)
-    {
+    if (is.numeric(numCores) == TRUE) {
         makeMethimpute_foreach(
             out.samplelist, merge_list, include.intermediate, out.dir, mincov,
-            numCores)
+            numCores, if.Bismark, FASTA.file)
     }
-    if (is.null(numCores) & parallelApply == FALSE)
-    {
+    if (is.null(numCores) & parallelApply == FALSE) {
         makeMethImpute_normal(
-            out.samplelist, merge_list, include.intermediate, out.dir, mincov)
+            out.samplelist, merge_list, include.intermediate, out.dir, mincov,
+            if.Bismark, FASTA.file)
     }
 }

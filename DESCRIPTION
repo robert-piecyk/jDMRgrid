@@ -1,7 +1,7 @@
 Package: jDMRgrid
 Type: Package
 Title: A heuristic DMR caller for large-scale WGBS data using grid approach
-Version: 0.2.3
+Version: 0.2.4
 Authors@R: c(
     person(given = c("Robert", "Stefan"), family = "Piecyk", email = "robert.s.piecyk@gmail.com", role = c("cre","aut"), comment=c(ORCID="0000-0002-7962-2907")),
     person(given = c("Rashmi", "Rekha"), family = "Hazarika", email = "hazarika.rr@gmail.com", role = "aut"),

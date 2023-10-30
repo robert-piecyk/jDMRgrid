@@ -5,7 +5,8 @@
 runjDMRgrid(
     out.dir, window, step, samplelist, contexts = c("CG", "CHG", "CHH"),
     min.C, mincov = 0, include.intermediate = FALSE, runName = "GridGenome",
-    numCores = NULL, parallelApply = FALSE
+    numCores = NULL, parallelApply = FALSE, if.Bismark = FALSE, 
+    FASTA.file = NULL
 )
 }
 \arguments{
@@ -41,6 +42,13 @@ foreach loop. Default to NULL. (numeric)}
 
 \item{parallelApply}{Logical specifying if futureapply method should be 
 performed to use parallel operation. Default to FALSE. (logical)}
+
+\item{if.Bismark}{Logical if Bismark inputs (CX reports in txt format)
+are used. Default as FALSE. (logical)}
+
+\item{FASTA.file}{Path to the FASTA file; required if Bismark outputs are
+used. Please use the same FASTA as in Bismark analysis. 
+Default as NULL. (char)}
 }
 \value{
 output files containing matrices of state calls, methylation levels 

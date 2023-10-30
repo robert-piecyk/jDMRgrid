@@ -1,4 +1,8 @@
-# jDMRgrid 0.2.3
+# jDMRgrid 0.2.4
+
+Changes in version 0.2.4 (2023-10-30)
+* jDMRgrid accepts Bismark CX reports (together with FASTA file; used in Bismark analysis)
+* fixed errors for R v4.0 and up
 
 Changes in version 0.2.3 (2023-10-24)
 * New form of samplefile: samplelist (DataFrame needs to supplied directly)

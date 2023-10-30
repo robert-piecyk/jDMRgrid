@@ -208,6 +208,8 @@ findMethylatedOrUnmethylated <- function(overlaps, overlaps.hits, data_gr)
 #' @param refRegion
 #' @param mincov
 #' @param nCytosines
+#' @param if.Bismark
+#' @param FASTA.file
 #' @import magrittr
 #' @importFrom dplyr filter
 #' @importFrom data.table fread
@@ -215,14 +217,29 @@ findMethylatedOrUnmethylated <- function(overlaps, overlaps.hits, data_gr)
 #' @importFrom S4Vectors queryHits subjectHits
 #' @importFrom stats aggregate
 #' @importFrom dplyr bind_rows
+#' @importFrom methimpute importBismark extractCytosinesFromFASTA 
+#' @importFrom mehtimpute inflateMethylome
 #' @return
 #' 
-makeRegionsImpute <- function(df, context, refRegion, mincov, nCytosines) {
+makeRegionsImpute <- function(
+        df, context, refRegion, mincov, nCytosines, if.Bismark, FASTA.file) {
     tmp_reg <- refRegion
     data <- as.data.frame(tmp_reg$reg.obs)
     data <- data %>% filter(data$chr != "M" & data$chr != "C")
     #reference methimpute file
-    ref_data <- fread(df, skip = 1, select = c("V1","V2","V3","V4","V5","V6"))
+    if (if.Bismark == FALSE) {
+        ref_data <- fread(
+            df, skip = 1, select = c("V1","V2","V3","V4","V5","V6"))
+    } else {
+        ref_data <- importBismark(df)
+        cytosine.positions <- extractCytosinesFromFASTA(
+            FASTA.file, contexts = as.character(context))
+        ref_data <- inflateMethylome(ref_data, cytosine.positions)
+        ref_data <- as.data.frame(ref_data)
+        ref_data <- ref_data[,-c(3,4)]
+        colnames(ref_data) <- c('V1','V2','V3','V4','V5','V6')
+        ref_data$V4 <- as.character(ref_data$V4)
+    }
     #remove Mt and chloroplast coordinates. Following is for Arabidopsis only
     ref_data <- ref_data %>% filter(ref_data$V1 != "M" & ref_data$V1 != "C")
     #filtering by coverage
@@ -265,14 +282,17 @@ makeRegionsImpute <- function(df, context, refRegion, mincov, nCytosines) {
 #' @param out.dir
 #' @param name
 #' @param mincov
+#' @param if.Bismark
+#' @param FASTA.file
 #' @importFrom methimpute distanceCorrelation callMethylation
 #' @return 
 #' 
 makeMethimpute <- function(
         df, context, fit.plot, fit.name, refRegion, include.intermediate, 
-        probability, out.dir, name, mincov)
+        probability, out.dir, name, mincov, if.Bismark, FASTA.file)
     {
-    methylome.data <- makeRegionsImpute(df, context, refRegion, mincov)
+    methylome.data <- makeRegionsImpute(
+        df, context, refRegion, mincov, if.Bismark, FASTA.file)
     if (!is.null(methylome.data$counts)) {
         quant.cutoff <- as.numeric(
             quantile(
