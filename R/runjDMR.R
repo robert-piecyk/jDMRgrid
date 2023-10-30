@@ -241,11 +241,11 @@ makeMethimpute_foreach <- function(
             name = basename(out.samplelist$methfn[jj]), mincov = mincov)
         return(grid.out)
     }
+    jk <- NULL
     info_lapply <- foreach(
         jk = seq_along(out.samplelist$context), .combine = "c", .packages = c(
             'methimpute'), .export = "jk") %dopar% 
         {
-            message(jk)
             runMethimputeJ(jk)
         }
     stopCluster(cl)
