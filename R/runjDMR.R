@@ -122,7 +122,7 @@ binGenome <- function(
     message('Creating grid...'); cyt.collect <- list()
     # from one of the methIMPUTE file extract all cytosines positions
     meth.out <- fread(methimputefiles[1],showProgress=FALSE)
-    if (if.Bismark == TRUE) {
+    if (if.Bismark == FALSE) {
         all.cyt.pos <- meth.out[,c('seqnames','start','strand','context')]
     } else {
         all.cyt.pos <- meth.out[,c(1,2,3,6)]
