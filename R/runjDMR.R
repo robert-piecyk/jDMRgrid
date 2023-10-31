@@ -121,10 +121,12 @@ binGenome <- function(
     # message about creating grid
     message('Creating grid...'); cyt.collect <- list()
     # from one of the methIMPUTE file extract all cytosines positions
-    meth.out <- as.data.frame(fread(methimputefiles[1],showProgress=FALSE))
-    all.cyt.pos <- ifelse(
-        if.Bismark==FALSE,meth.out[,c('seqnames','start','strand','context')],
-        meth.out[,c(1,2,3,6)])
+    meth.out <- fread(methimputefiles[1],showProgress=FALSE)
+    if (if.Bismark == TRUE) {
+        all.cyt.pos <- meth.out[,c('seqnames','start','strand','context')]
+    } else {
+        all.cyt.pos <- meth.out[,c(1,2,3,6)]
+    }
     colnames(all.cyt.pos) <- c('chr','pos','strand','context')
     # create a GRanges object from the cytosines positions
     cyt_gr <- GRanges(seqnames=all.cyt.pos$chr,ranges=IRanges(
