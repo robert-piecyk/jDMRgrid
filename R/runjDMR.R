@@ -264,8 +264,8 @@ makeMethimpute_foreach <- function(
     }
     jk.list <- seq_along(out.samplelist$context)
     info_lapply <- foreach(
-        jk = jk.list, .combine = "c", .packages = c(
-            'methimpute'), .export = "jk") %dopar% 
+        jk = 1:max(jk.list), .combine = "c", .packages = c(
+            'methimpute'), .export = ".env") %dopar% 
         {
             runMethimputeJ(jk)
         }
