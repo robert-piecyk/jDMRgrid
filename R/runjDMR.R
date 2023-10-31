@@ -135,9 +135,11 @@ binGenome <- function(
         chr.lengths <- unlist(
             lapply(chr.names, function(x) max(
                 meth.out$start[meth.out$seqnames == x])))
-        names(chr.lengths) <- chr.names } else {
+        names(chr.lengths) <- chr.names 
+    } else {
         fasta.out <- readDNAStringSet(FASTA.file)
-        chr.lengths <- unlist(lapply(fasta.out, length) }
+        chr.lengths <- unlist(lapply(fasta.out, length))
+    }
     # create a GRanges object from the chromosome (fasta) start-end positions
     gr <- GRanges(seqnames=names(chr.lengths),ranges=IRanges(
         start=1, end=chr.lengths))
