@@ -267,6 +267,7 @@ makeMethimpute_foreach <- function(
         jk = 1:max(jk.list), .combine = "c", .packages = c(
             'methimpute')) %dopar% 
         {
+            message(jk)
             runMethimputeJ(jk)
         }
     stopCluster(cl)
