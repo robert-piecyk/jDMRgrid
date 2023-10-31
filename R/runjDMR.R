@@ -246,29 +246,33 @@ makeMethimpute_foreach <- function(
 {
     cl <- makeCluster(numCores)
     registerDoParallel(cl)
-    jk_list <- seq_along(out.samplelist$context)
+    runMethimputeJ <- function(jj) {
+        refRegion <- list(reg.obs = merge_list[[out.samplelist$id[jj]]])
+        message("Running file: ", out.samplelist$methfn[jj],
+                " for context: ", out.samplelist$context[jj], "\n")
+        grid.out <- makeMethimpute(
+            df = as.character(out.samplelist$file[jj]),
+            context = out.samplelist$context[jj],
+            refRegion = refRegion, fit.plot = FALSE,
+            include.intermediate = include.intermediate,
+            probability = "constrained",out.dir = out.dir,
+            fit.name = paste0(
+                basename(out.samplelist$methfn[jj]), "_",
+                out.samplelist$context[jj]),
+            name = basename(out.samplelist$methfn[jj]), mincov = mincov,
+            if.Bismark = if.Bismark, FASTA.file = FASTA.file)
+        return(grid.out)
+    }
+    jk <- NULL
     info_lapply <- foreach(
-        i=1:max(jk_list), .combine = "c", .packages = c(
-            'methimpute')) %dopar% 
+        jk = seq_along(out.samplelist$context), .combine = "c", .packages = c(
+            'methimpute'), .export = "jk") %dopar% 
         {
-            refRegion <-list(reg.obs = merge_list[[out.samplelist$id[i]]])
-            message("Running file: ", out.samplelist$methfn[i],
-                    " for context: ", out.samplelist$context[i], "\n")
-            grid.out <- makeMethimpute(
-                df = as.character(out.samplelist$file[i]),
-                context = out.samplelist$context[i],
-                refRegion = refRegion, fit.plot = FALSE,
-                include.intermediate = include.intermediate,
-                probability = "constrained",out.dir = out.dir,
-                fit.name = paste0(
-                    basename(out.samplelist$methfn[i]), "_",
-                    out.samplelist$context[i]),
-                name = basename(out.samplelist$methfn[i]),mincov = mincov,
-                if.Bismark = if.Bismark, FASTA.file = FASTA.file)
-            return(grid.out)
+            runMethimputeJ(jk)
         }
     stopCluster(cl)
 }
+
 
 #-----------------------------------------------------------------------------
 #' Run makeMethimpute using single-core method
