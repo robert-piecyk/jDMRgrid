@@ -226,6 +226,8 @@ makeRegionsImpute <- function(
     tmp_reg <- refRegion
     data <- as.data.frame(tmp_reg$reg.obs)
     data <- data %>% filter(data$chr != "M" & data$chr != "C")
+    message('Bismark:' if.Bismark)
+    message('FASTA:' FASTA.file)
     #reference methimpute file
     if (if.Bismark == TRUE) {
         ref_data <- importBismark(df)
