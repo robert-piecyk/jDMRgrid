@@ -227,7 +227,6 @@ makeRegionsImpute <- function(
     data <- as.data.frame(tmp_reg$reg.obs)
     data <- data %>% filter(data$chr != "M" & data$chr != "C")
     #reference methimpute file
-    message('Bismark:', if.Bismark)
     if (if.Bismark == TRUE) {
         ref_data <- importBismark(df)
         cytosine.positions <- cyt.pos.all[cyt.pos.all$context == context]
