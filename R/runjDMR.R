@@ -245,33 +245,28 @@ makeMethimpute_foreach <- function(
 {
     cl <- makeCluster(numCores)
     registerDoParallel(cl)
-    runMethimputeJ <- function(jk) {
-        refRegion <- list(reg.obs = merge_list[[out.samplelist$id[jk]]])
-        message("Running file: ", out.samplelist$methfn[jk],
-                " for context: ", out.samplelist$context[jk], "\n")
-        grid.out <- makeMethimpute(
-            df = as.character(out.samplelist$file[jk]),
-            context = out.samplelist$context[jk],
-            refRegion = refRegion, fit.plot = FALSE,
-            include.intermediate = include.intermediate,
-            probability = "constrained",out.dir = out.dir,
-            fit.name = paste0(
-                basename(out.samplelist$methfn[jk]), "_",
-                out.samplelist$context[jk]),
-            name = basename(out.samplelist$methfn[jk]), mincov = mincov,
-            if.Bismark = if.Bismark, FASTA.file = FASTA.file)
-        return(grid.out)
-    }
     jk.list <- seq_along(out.samplelist$context)
-    jk <- NULL
     info_lapply <- foreach(
         jk = jk.list, .combine = "c", .packages = c(
             'methimpute'), .export = c(
                 ".env", "out.samplelist", "merge_list", "include.intermediate", 
                 "out.dir", "mincov", "if.Bismark", "FASTA.file", "jk")) %dopar% 
         {
-            message('Itteration', jk)
-            #runMethimputeJ(jk)
+            refRegion <- list(reg.obs = merge_list[[out.samplelist$id[jk]]])
+            message("Running file: ", out.samplelist$methfn[jk],
+                    " for context: ", out.samplelist$context[jk], "\n")
+            grid.out <- makeMethimpute(
+                df = as.character(out.samplelist$file[jk]),
+                context = out.samplelist$context[jk],
+                refRegion = refRegion, fit.plot = FALSE,
+                include.intermediate = include.intermediate,
+                probability = "constrained",out.dir = out.dir,
+                fit.name = paste0(
+                    basename(out.samplelist$methfn[jk]), "_",
+                    out.samplelist$context[jk]),
+                name = basename(out.samplelist$methfn[jk]), mincov = mincov,
+                if.Bismark = if.Bismark, FASTA.file = FASTA.file)
+            return(grid.out)
         }
     stopCluster(cl)
 }
