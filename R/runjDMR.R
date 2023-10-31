@@ -245,20 +245,20 @@ makeMethimpute_foreach <- function(
 {
     cl <- makeCluster(numCores)
     registerDoParallel(cl)
-    runMethimputeJ <- function(jj) {
-        refRegion <- list(reg.obs = merge_list[[out.samplelist$id[jj]]])
-        message("Running file: ", out.samplelist$methfn[jj],
-                " for context: ", out.samplelist$context[jj], "\n")
+    runMethimputeJ <- function(jk) {
+        refRegion <- list(reg.obs = merge_list[[out.samplelist$id[jk]]])
+        message("Running file: ", out.samplelist$methfn[jk],
+                " for context: ", out.samplelist$context[jk], "\n")
         grid.out <- makeMethimpute(
-            df = as.character(out.samplelist$file[jj]),
-            context = out.samplelist$context[jj],
+            df = as.character(out.samplelist$file[jk]),
+            context = out.samplelist$context[jk],
             refRegion = refRegion, fit.plot = FALSE,
             include.intermediate = include.intermediate,
             probability = "constrained",out.dir = out.dir,
             fit.name = paste0(
-                basename(out.samplelist$methfn[jj]), "_",
-                out.samplelist$context[jj]),
-            name = basename(out.samplelist$methfn[jj]), mincov = mincov,
+                basename(out.samplelist$methfn[jk]), "_",
+                out.samplelist$context[jk]),
+            name = basename(out.samplelist$methfn[jk]), mincov = mincov,
             if.Bismark = if.Bismark, FASTA.file = FASTA.file)
         return(grid.out)
     }
