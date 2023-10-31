@@ -236,9 +236,9 @@ makeRegionsImpute <- function(
         ref_data <- ref_data[,-c(3,4)]
         colnames(ref_data) <- c('V1','V2','V3','V4','V5','V6')
     } else {
-        ref_data$V4 <- as.character(ref_data$V4)
         ref_data <- fread(
             df, skip = 1, select = c("V1","V2","V3","V4","V5","V6"))
+        ref_data$V4 <- as.character(ref_data$V4)
     }
     #remove Mt and chloroplast coordinates. Following is for Arabidopsis only
     ref_data <- ref_data %>% filter(ref_data$V1 != "M" & ref_data$V1 != "C")
@@ -293,7 +293,7 @@ makeMethimpute <- function(
         FASTA.file = FALSE)
     {
     methylome.data <- makeRegionsImpute(
-        df=df, context=context, refRegion=refRegion, mincov=mincov, 
+        df=df, context=context, ref_data=refRegion, mincov=mincov, 
         if.Bismark=if.Bismark, FASTA.file=FASTA.file)
     if (!is.null(methylome.data$counts)) {
         quant.cutoff <- as.numeric(
