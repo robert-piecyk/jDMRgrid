@@ -271,7 +271,7 @@ makeMethimpute_foreach <- function(
                 "out.dir", "mincov", "if.Bismark", "FASTA.file")) %dopar% 
         {
             message('Itteration', jk)
-            runMethimputeJ(jk)
+            #runMethimputeJ(jk)
         }
     stopCluster(cl)
 }
