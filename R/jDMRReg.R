@@ -226,8 +226,6 @@ makeRegionsImpute <- function(
     tmp_reg <- refRegion
     data <- as.data.frame(tmp_reg$reg.obs)
     data <- data %>% filter(data$chr != "M" & data$chr != "C")
-    message('Bismark:', if.Bismark)
-    message('FASTA:', FASTA.file)
     #reference methimpute file
     if (if.Bismark == TRUE) {
         ref_data <- importBismark(df)
@@ -294,16 +292,15 @@ makeMethimpute <- function(
         probability, out.dir, name, mincov, if.Bismark = FALSE, 
         FASTA.file = FALSE)
     {
-    message('Bismark:', if.Bismark)
-    message('FASTA:', FASTA.file)
     methylome.data <- makeRegionsImpute(
-        df, context, refRegion, mincov, if.Bismark, FASTA.file)
+        df=df, context=context, refRegion=refRegion, mincov=mincov, 
+        if.Bismark=if.Bismark, FASTA.file=FASTA.file)
     if (!is.null(methylome.data$counts)) {
         quant.cutoff <- as.numeric(
             quantile(
                 methylome.data$counts[,"total"], probs = c(0.96), na.rm=TRUE))
-        distcor <- distanceCorrelation(methylome.data, distances=0:100)
-        fit <- modified.estimateTransDist(distcor = distcor, skip = 2)
+        distcor <- distanceCorrelation(data=methylome.data, distances=0:100)
+        fit <- modified.estimateTransDist(distcor=distcor, skip=2)
         if (fit.plot==TRUE){
             message("Generating fit plot for ", name)
             pdf(paste0(out.dir, "/", fit.name, "-fit.pdf", sep = ""))
