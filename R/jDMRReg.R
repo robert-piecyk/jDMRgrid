@@ -289,8 +289,8 @@ makeRegionsImpute <- function(
 #' 
 makeMethimpute <- function(
         df, context, fit.plot, fit.name, refRegion, include.intermediate, 
-        probability, out.dir, name, mincov, if.Bismark = FALSE, 
-        FASTA.file = FALSE)
+        probability, out.dir, name, mincov, if.Bismark, 
+        FASTA.file)
     {
     methylome.data <- makeRegionsImpute(
         df=df, context=context, refRegion=refRegion, mincov=mincov, 
