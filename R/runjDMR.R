@@ -350,6 +350,7 @@ makeMethImpute_normal <- function(
 #' @importFrom stringr str_remove_all
 #' @importFrom IRanges slidingWindows
 #' @importFrom parallel makeCluster stopCluster
+#' @importFrom methimpute extractCytosinesFromFASTA
 #' @importFrom rlang .data
 #' @return Output methylome files for the regions using grid genome from 
 #'         non/sliding window approach.
