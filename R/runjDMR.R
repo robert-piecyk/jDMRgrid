@@ -384,8 +384,8 @@ runjDMRgrid <- function(
     out.samplelist <- expand.grid(file = samplelist$file, context = contexts)
     out.samplelist <- merge(out.samplelist, data.frame(
         context = names(bin.select), id = seq(1,length(names(bin.select)))))
-    message('Bismark:' if.Bismark)
-    message('FASTA:' FASTA.file)
+    message('Bismark:', if.Bismark)
+    message('FASTA:', FASTA.file)
     if (if.Bismark == FALSE) {
         out.samplelist$methfn<-unlist(lapply(out.samplelist$file,function(xi){
                 gsub(".*methylome_|\\.txt|_All.txt$","",xi)}))} else {

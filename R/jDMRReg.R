@@ -226,8 +226,8 @@ makeRegionsImpute <- function(
     tmp_reg <- refRegion
     data <- as.data.frame(tmp_reg$reg.obs)
     data <- data %>% filter(data$chr != "M" & data$chr != "C")
-    message('Bismark:' if.Bismark)
-    message('FASTA:' FASTA.file)
+    message('Bismark:', if.Bismark)
+    message('FASTA:', FASTA.file)
     #reference methimpute file
     if (if.Bismark == TRUE) {
         ref_data <- importBismark(df)
@@ -294,6 +294,8 @@ makeMethimpute <- function(
         probability, out.dir, name, mincov, if.Bismark = FALSE, 
         FASTA.file = NULL)
     {
+    message('Bismark:', if.Bismark)
+    message('FASTA:', FASTA.file)
     methylome.data <- makeRegionsImpute(
         df, context, refRegion, mincov, if.Bismark, FASTA.file)
     if (!is.null(methylome.data$counts)) {
