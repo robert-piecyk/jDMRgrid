@@ -264,6 +264,7 @@ makeMethimpute_foreach <- function(
     }
     jk.list <- seq_along(out.samplelist$context)
     message(jk.list)
+    jk <- NULL
     info_lapply <- foreach(
         jk = 1:max(jk.list), .combine = "c", .packages = c(
             'methimpute'), .export = c(
