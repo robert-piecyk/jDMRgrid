@@ -363,12 +363,10 @@ runjDMRgrid <- function(
         FASTA.file = NULL)
 {
     methimputefiles <- samplelist$file
-    # Step 1: Bin genome according to the window and step size
     bin.genome.files <- binGenome(
         methimputefiles = methimputefiles, contexts = contexts, 
         window = window, step = step, min.C = min.C, out.dir = out.dir,
         runName = runName, if.Bismark = if.Bismark, FASTA.file = FASTA.file)
-    # Step 2: Extract RData for binned regions and name them as contexts
     bin.select <- lapply(seq_along(contexts), function(x) {
         b <- bin.genome.files[grep(contexts[x], bin.genome.files)]
         if (length(b) != 0) {
@@ -376,32 +374,28 @@ runjDMRgrid <- function(
             return(b) }})
     bin.select <- Filter(Negate(is.null), bin.select)
     names(bin.select) <- unlist(lapply(bin.select, function(x) names(x)[1]))
-    # Step 3: Read all RData binned regions
     merge_list <- lapply(bin.select, function(x) dget(x))
-    # Step 4: Create data frame consisting of: contexts, methImpute files,
-    # sample names (from methImpute files)
-    # and IDs corresponding to the binned genome
     out.samplelist <- expand.grid(file = samplelist$file, context = contexts)
     out.samplelist <- merge(out.samplelist, data.frame(
         context = names(bin.select), id = seq(1,length(names(bin.select)))))
-    message('Bismark:', if.Bismark)
-    message('FASTA:', FASTA.file)
     if (if.Bismark == FALSE) {
         out.samplelist$methfn<-unlist(lapply(out.samplelist$file,function(xi){
                 gsub(".*methylome_|\\.txt|_All.txt$","",xi)}))} else {
         out.samplelist$methfn<-unlist(lapply(out.samplelist$file,function(xi){
                 gsub("|\\.txt|.CX_report.txt$","",xi)}))}
-    # Step 5: Run makeMethimpute for files in out.samplelist
     if (parallelApply == TRUE) {
         makeMethimpute_future(
-            out.samplelist, merge_list, include.intermediate, out.dir, mincov,
-            if.Bismark, FASTA.file) }
+            out.samplelist=out.samplelist,merge_list=merge_list,mincov=mincov,
+            include.intermediate=include.intermediate,out.dir=out.dir,
+            if.Bismark=if.Bismark,FASTA.file=FASTA.file) }
     if (is.numeric(numCores) == TRUE) {
         makeMethimpute_foreach(
-            out.samplelist, merge_list, include.intermediate, out.dir, mincov,
-            numCores, if.Bismark, FASTA.file) }
+            out.samplelist=out.samplelist,merge_list=merge_list,mincov=mincov,
+            include.intermediate=include.intermediate,out.dir=out.dir,
+            numCores=numCores,if.Bismark=if.Bismark,FASTA.file=FASTA.file) }
     if (is.null(numCores) & parallelApply == FALSE) {
         makeMethImpute_normal(
-            out.samplelist, merge_list, include.intermediate, out.dir, mincov,
-            if.Bismark, FASTA.file) }
+            out.samplelist=out.samplelist,merge_list=merge_list,mincov=mincov,
+            include.intermediate=include.intermediate,out.dir=out.dir,
+            if.Bismark=if.Bismark,FASTA.file=FASTA.file) }
 }

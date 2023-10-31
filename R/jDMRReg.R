@@ -292,7 +292,7 @@ makeRegionsImpute <- function(
 makeMethimpute <- function(
         df, context, fit.plot, fit.name, refRegion, include.intermediate, 
         probability, out.dir, name, mincov, if.Bismark = FALSE, 
-        FASTA.file = NULL)
+        FASTA.file = FALSE)
     {
     message('Bismark:', if.Bismark)
     message('FASTA:', FASTA.file)
