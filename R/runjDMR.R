@@ -248,25 +248,22 @@ makeMethimpute_foreach <- function(
     registerDoParallel(cl)
     jk_list <- seq_along(out.samplelist$context)
     info_lapply <- foreach(
-        jk_obj = 1:max(jk_list), .combine = "c", .packages = c(
-            'methimpute'), .export = c(
-                "out.samplelist", "merge_list", "include.intermediate", 
-                "out.dir", "mincov", "if.Bismark", "FASTA.file", "jk_obj")
-        ) %dopar% 
+        i=1:max(jk_list), .combine = "c", .packages = c(
+            'methimpute')) %dopar% 
         {
-            refRegion <-list(reg.obs = merge_list[[out.samplelist$id[jk_obj]]])
-            message("Running file: ", out.samplelist$methfn[jk_obj],
-                    " for context: ", out.samplelist$context[jk_obj], "\n")
+            refRegion <-list(reg.obs = merge_list[[out.samplelist$id[i]]])
+            message("Running file: ", out.samplelist$methfn[i],
+                    " for context: ", out.samplelist$context[i], "\n")
             grid.out <- makeMethimpute(
-                df = as.character(out.samplelist$file[jk_obj]),
-                context = out.samplelist$context[jk_obj],
+                df = as.character(out.samplelist$file[i]),
+                context = out.samplelist$context[i],
                 refRegion = refRegion, fit.plot = FALSE,
                 include.intermediate = include.intermediate,
                 probability = "constrained",out.dir = out.dir,
                 fit.name = paste0(
-                    basename(out.samplelist$methfn[jk_obj]), "_",
-                    out.samplelist$context[jk_obj]),
-                name = basename(out.samplelist$methfn[jk_obj]),mincov = mincov,
+                    basename(out.samplelist$methfn[i]), "_",
+                    out.samplelist$context[i]),
+                name = basename(out.samplelist$methfn[i]),mincov = mincov,
                 if.Bismark = if.Bismark, FASTA.file = FASTA.file)
             return(grid.out)
         }
