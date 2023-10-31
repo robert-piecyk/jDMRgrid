@@ -250,7 +250,7 @@ makeMethimpute_foreach <- function(
     info_lapply <- foreach(
         jk_obj = 1:max(jk_list), .combine = "c", .packages = c(
             'methimpute'), .export = c(
-                ".env", "out.samplelist", "merge_list", "include.intermediate", 
+                "out.samplelist", "merge_list", "include.intermediate", 
                 "out.dir", "mincov", "if.Bismark", "FASTA.file", "jk_obj")
         ) %dopar% 
         {
