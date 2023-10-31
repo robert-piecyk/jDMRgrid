@@ -158,8 +158,8 @@ binGenome <- function(
         #mybins <- lapply(out, function(x) x[which.min(x$ratio),])
         collect.bins <- lapply(results, function(x) x$collect.bins)
         message("Exporting regions...")
-        lapply(
-                mylist=x, out.dir=out.dir,runName=runName))
+        lapply(collect.bins, function(x) export.bins(
+            mylist=x, out.dir=out.dir,runName=runName))
         return(list.files(out.dir, pattern=paste0(
                 ".*", runName, ".*\\.Rdata$"), full.names=TRUE))
     }
@@ -262,9 +262,9 @@ makeMethimpute_foreach <- function(
             if.Bismark = if.Bismark, FASTA.file = FASTA.file)
         return(grid.out)
     }
-    jk <- NULL
+    jk.list <- seq_along(out.samplelist$context)
     info_lapply <- foreach(
-        jk = seq_along(out.samplelist$context), .combine = "c", .packages = c(
+        jk = jk.list, .combine = "c", .packages = c(
             'methimpute'), .export = "jk") %dopar% 
         {
             runMethimputeJ(jk)
