@@ -209,7 +209,7 @@ findMethylatedOrUnmethylated <- function(overlaps, overlaps.hits, data_gr)
 #' @param mincov
 #' @param nCytosines
 #' @param if.Bismark
-#' @param FASTA.file
+#' @param cyt.pos.all
 #' @import magrittr
 #' @importFrom dplyr filter
 #' @importFrom data.table fread
@@ -222,7 +222,7 @@ findMethylatedOrUnmethylated <- function(overlaps, overlaps.hits, data_gr)
 #' @return
 #' 
 makeRegionsImpute <- function(
-        df, context, refRegion, mincov, nCytosines, if.Bismark, FASTA.file) {
+        df, context, refRegion, mincov, nCytosines, if.Bismark, cyt.pos.all) {
     tmp_reg <- refRegion
     data <- as.data.frame(tmp_reg$reg.obs)
     data <- data %>% filter(data$chr != "M" & data$chr != "C")
@@ -230,8 +230,7 @@ makeRegionsImpute <- function(
     message('Bismark:', if.Bismark)
     if (if.Bismark == TRUE) {
         ref_data <- importBismark(df)
-        cytosine.positions <- extractCytosinesFromFASTA(
-            FASTA.file, contexts = as.character(context))
+        cytosine.positions <- cyt.pos.all[cyt.pos.all$context == context]
         ref_data <- inflateMethylome(ref_data, cytosine.positions)
         ref_data <- as.data.frame(ref_data)
         ref_data <- ref_data[,-c(3,4)]
@@ -239,8 +238,8 @@ makeRegionsImpute <- function(
     } else {
         ref_data <- fread(
             df, skip = 1, select = c("V1","V2","V3","V4","V5","V6"))
-        ref_data$V4 <- as.character(ref_data$V4)
     }
+    ref_data$V4 <- as.character(ref_data$V4)
     #remove Mt and chloroplast coordinates. Following is for Arabidopsis only
     ref_data <- ref_data %>% filter(ref_data$V1 != "M" & ref_data$V1 != "C")
     #filtering by coverage
@@ -284,18 +283,18 @@ makeRegionsImpute <- function(
 #' @param name
 #' @param mincov
 #' @param if.Bismark
-#' @param FASTA.file
+#' @param cyt.pos.all
 #' @importFrom methimpute distanceCorrelation callMethylation
 #' @return 
 #' 
 makeMethimpute <- function(
         df, context, fit.plot, fit.name, refRegion, include.intermediate, 
         probability, out.dir, name, mincov, if.Bismark, 
-        FASTA.file)
+        cyt.pos.all)
     {
     methylome.data <- makeRegionsImpute(
         df=df, context=context, refRegion=refRegion, mincov=mincov, 
-        if.Bismark=if.Bismark, FASTA.file=FASTA.file)
+        if.Bismark=if.Bismark, cyt.pos.all=cyt.pos.all)
     if (!is.null(methylome.data$counts)) {
         quant.cutoff <- as.numeric(
             quantile(

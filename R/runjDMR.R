@@ -182,8 +182,7 @@ binGenome <- function(
 #' @param mincov Minimum read coverage; default as 0. (num; between 0 and 1)
 #' @param if.Bismark Logical if Bismark inputs (CX reports in txt format)
 #'                   are used. Default as FALSE. (logical)
-#' @param FASTA.file Path to the FASTA file; required if Bismark outputs are
-#'                   used. Default as NULL. (char)
+#' @param cyt.pos.all GRanges object from extractCytosinesFromFASTA. (GRanges)
 #' @import magrittr
 #' @import future
 #' @import future.apply
@@ -193,7 +192,7 @@ binGenome <- function(
 #' 
 makeMethimpute_future <- function(
         out.samplelist, merge_list, include.intermediate, out.dir, mincov,
-        if.Bismark, FASTA.file)
+        if.Bismark, cyt.pos.all)
 {
     plan(multisession)
     info_lapply <- future_lapply(
@@ -211,7 +210,7 @@ makeMethimpute_future <- function(
                     basename(out.samplelist$methfn[j]), "_",
                     out.samplelist$context[j]),
                 name = basename(out.samplelist$methfn[j]), mincov = mincov,
-                if.Bismark = if.Bismark, FASTA.file = FASTA.file)}, 
+                if.Bismark = if.Bismark, cyt.pos.all = cyt.pos.all)}, 
         future.seed = NULL)
 }
 
@@ -231,8 +230,7 @@ makeMethimpute_future <- function(
 #'                 performed; default as NULL. (num)
 #' @param if.Bismark Logical if Bismark inputs (CX reports in txt format)
 #'                   are used. Default as FALSE. (logical)
-#' @param FASTA.file Path to the FASTA file; required if Bismark outputs are
-#'                   used. Default as NULL. (char)
+#' @param cyt.pos.all GRanges object from extractCytosinesFromFASTA. (GRanges)
 #' @import magrittr
 #' @import foreach
 #' @import doParallel
@@ -244,7 +242,7 @@ makeMethimpute_future <- function(
 #'
 makeMethimpute_foreach <- function(
         out.samplelist, merge_list, include.intermediate, out.dir, mincov, 
-        numCores, if.Bismark, FASTA.file)
+        numCores, if.Bismark, cyt.pos.all)
 {
     cl <- makeCluster(numCores)
     registerDoParallel(cl)
@@ -262,7 +260,7 @@ makeMethimpute_foreach <- function(
                 basename(out.samplelist$methfn[jj]), "_",
                 out.samplelist$context[jj]),
             name = basename(out.samplelist$methfn[jj]), mincov = mincov,
-            if.Bismark = if.Bismark, FASTA.file = FASTA.file)
+            if.Bismark = if.Bismark, cyt.pos.all = cyt.pos.all)
         return(grid.out)
     }
     jk <- NULL
@@ -290,14 +288,13 @@ makeMethimpute_foreach <- function(
 #' @param mincov Minimum read coverage; default as 0. (num; between 0 and 1)
 #' @param if.Bismark Logical if Bismark inputs (CX reports in txt format)
 #'                   are used. Default as FALSE. (logical)
-#' @param FASTA.file Path to the FASTA file; required if Bismark outputs are
-#'                   used. Default as NULL. (char)
+#' @param cyt.pos.all GRanges object from extractCytosinesFromFASTA. (GRanges)
 #' @return Methylome for regions taken out grid genome from non/sliding window
 #'         approach
 #' 
 makeMethImpute_normal <- function(
         out.samplelist, merge_list, include.intermediate, out.dir, mincov,
-        if.Bismark, FASTA.file)
+        if.Bismark, cyt.pos.all)
 {
     info_lapply <- lapply(seq_along(out.samplelist$context), function(jn) {
         refRegion <- list(reg.obs = merge_list[[out.samplelist$id[jn]]])
@@ -314,7 +311,7 @@ makeMethImpute_normal <- function(
                 basename(out.samplelist$methfn[jn]), "_",
                 out.samplelist$context[jn]), name = basename(
                     out.samplelist$methfn[jn]), mincov = mincov, 
-            if.Bismark = if.Bismark, FASTA.file = FASTA.file)
+            if.Bismark = if.Bismark, cyt.pos.all = cyt.pos.all)
     })
 }
 
@@ -380,6 +377,9 @@ runjDMRgrid <- function(
     out.samplelist <- expand.grid(file = samplelist$file, context = contexts)
     out.samplelist <- merge(out.samplelist, data.frame(
         context = names(bin.select), id = seq(1,length(names(bin.select)))))
+    cyt.pos.all <- ifelse(
+        if.Bismark==TRUE, extractCytosinesFromFASTA(
+            file = FASTA.file, contexts = contexts), NULL)
     if (if.Bismark == FALSE) {
         out.samplelist$methfn<-unlist(lapply(out.samplelist$file,function(xi){
                 gsub(".*methylome_|\\.txt|_All.txt$","",xi)}))} else {
@@ -389,15 +389,15 @@ runjDMRgrid <- function(
         makeMethimpute_future(
             out.samplelist=out.samplelist,merge_list=merge_list,mincov=mincov,
             include.intermediate=include.intermediate,out.dir=out.dir,
-            if.Bismark=if.Bismark,FASTA.file=FASTA.file) }
+            if.Bismark=if.Bismark,cyt.pos.all=cyt.pos.all) }
     if (is.numeric(numCores) == TRUE) {
         makeMethimpute_foreach(
             out.samplelist=out.samplelist,merge_list=merge_list,mincov=mincov,
             include.intermediate=include.intermediate,out.dir=out.dir,
-            numCores=numCores,if.Bismark=if.Bismark,FASTA.file=FASTA.file) }
+            numCores=numCores,if.Bismark=if.Bismark,cyt.pos.all=cyt.pos.all) }
     if (is.null(numCores) & parallelApply == FALSE) {
         makeMethImpute_normal(
             out.samplelist=out.samplelist,merge_list=merge_list,mincov=mincov,
             include.intermediate=include.intermediate,out.dir=out.dir,
-            if.Bismark=if.Bismark,FASTA.file=FASTA.file) }
+            if.Bismark=if.Bismark,cyt.pos.all=cyt.pos.all) }
 }
