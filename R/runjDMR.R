@@ -378,14 +378,14 @@ runjDMRgrid <- function(
     out.samplelist <- expand.grid(file = samplelist$file, context = contexts)
     out.samplelist <- merge(out.samplelist, data.frame(
         context = names(bin.select), id = seq(1,length(names(bin.select)))))
-    cyt.pos.all <- ifelse(
-        if.Bismark==TRUE, extractCytosinesFromFASTA(
-            file = FASTA.file, contexts = contexts), NULL)
     if (if.Bismark == FALSE) {
         out.samplelist$methfn<-unlist(lapply(out.samplelist$file,function(xi){
-                gsub(".*methylome_|\\.txt|_All.txt$","",xi)}))} else {
+                gsub(".*methylome_|\\.txt|_All.txt$","",xi)}))
+        cyt.pos.all<-NULL} else {
         out.samplelist$methfn<-unlist(lapply(out.samplelist$file,function(xi){
-                gsub("|\\.txt|.CX_report.txt$","",xi)}))}
+                gsub("|\\.txt|.CX_report.txt$","",xi)}))
+        cyt.pos.all<-extractCytosinesFromFASTA(
+            file = FASTA.file, contexts = contexts)}
     if (parallelApply == TRUE) {
         makeMethimpute_future(
             out.samplelist=out.samplelist,merge_list=merge_list,mincov=mincov,
