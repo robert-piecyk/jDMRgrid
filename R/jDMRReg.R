@@ -227,10 +227,7 @@ makeRegionsImpute <- function(
     data <- as.data.frame(tmp_reg$reg.obs)
     data <- data %>% filter(data$chr != "M" & data$chr != "C")
     #reference methimpute file
-    if (if.Bismark == FALSE) {
-        ref_data <- fread(
-            df, skip = 1, select = c("V1","V2","V3","V4","V5","V6"))
-    } else {
+    if (if.Bismark == TRUE) {
         ref_data <- importBismark(df)
         cytosine.positions <- extractCytosinesFromFASTA(
             FASTA.file, contexts = as.character(context))
@@ -238,7 +235,10 @@ makeRegionsImpute <- function(
         ref_data <- as.data.frame(ref_data)
         ref_data <- ref_data[,-c(3,4)]
         colnames(ref_data) <- c('V1','V2','V3','V4','V5','V6')
+    } else {
         ref_data$V4 <- as.character(ref_data$V4)
+        ref_data <- fread(
+            df, skip = 1, select = c("V1","V2","V3","V4","V5","V6"))
     }
     #remove Mt and chloroplast coordinates. Following is for Arabidopsis only
     ref_data <- ref_data %>% filter(ref_data$V1 != "M" & ref_data$V1 != "C")
@@ -291,7 +291,6 @@ makeMethimpute <- function(
         df, context, fit.plot, fit.name, refRegion, include.intermediate, 
         probability, out.dir, name, mincov, if.Bismark, FASTA.file)
     {
-    message(if.Bismark)
     methylome.data <- makeRegionsImpute(
         df, context, refRegion, mincov, if.Bismark, FASTA.file)
     if (!is.null(methylome.data$counts)) {
