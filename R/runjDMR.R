@@ -130,7 +130,7 @@ binGenome <- function(
         start=all.cyt.pos$pos, width=1),context=all.cyt.pos$context,
         strand=all.cyt.pos$strand)
     # get length of chromosomesś
-    if (if.Bismark == FALSE & FASTA.file == NULL) {
+    if (FASTA.file == NULL) {
         chr.names <- unique(meth.out$seqnames)
         chr.lengths <- unlist(
             lapply(chr.names, function(x) max(
