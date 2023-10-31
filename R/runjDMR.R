@@ -357,7 +357,7 @@ makeMethImpute_normal <- function(
 runjDMRgrid <- function(
         out.dir, window, step, samplelist, contexts=c('CG','CHG','CHH'), 
         min.C, mincov=0, include.intermediate=FALSE, runName='GridGenome',
-        numCores = NULL, parallelApply = FALSE, if.Bismark = FALSE
+        numCores = NULL, parallelApply = FALSE, if.Bismark = FALSE,
         FASTA.file = NULL)
 {
     methimputefiles <- samplelist$file
