@@ -238,6 +238,7 @@ makeMethimpute_future <- function(
 #' @importFrom parallel makeCluster stopCluster                
 #' @return Methylome for regions taken out grid genome from non/sliding window
 #'         approach
+#' @export
 #'
 makeMethimpute_foreach <- function(
         out.samplelist, merge_list, include.intermediate, out.dir, mincov, 
@@ -245,9 +246,9 @@ makeMethimpute_foreach <- function(
 {
     cl <- makeCluster(numCores)
     registerDoParallel(cl)
-    jk.list <- seq_along(out.samplelist$context)
+    jk_list <- seq_along(out.samplelist$context)
     info_lapply <- foreach(
-        jk_obj = 1:max(jk.list), .combine = "c", .packages = c(
+        jk_obj = 1:max(jk_list), .combine = "c", .packages = c(
             'methimpute'), .export = c(
                 ".env", "out.samplelist", "merge_list", "include.intermediate", 
                 "out.dir", "mincov", "if.Bismark", "FASTA.file", "jk_obj")
