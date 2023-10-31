@@ -263,11 +263,14 @@ makeMethimpute_foreach <- function(
         return(grid.out)
     }
     jk.list <- seq_along(out.samplelist$context)
+    message(jk.list)
     info_lapply <- foreach(
         jk = 1:max(jk.list), .combine = "c", .packages = c(
-            'methimpute')) %dopar% 
+            'methimpute'), .export = c(
+                ".env", "out.samplelist", "merge_list", "include.intermediate", 
+                "out.dir", "mincov", "if.Bismark", "FASTA.file")) %dopar% 
         {
-            message(jk)
+            message('Itteration', jk)
             runMethimputeJ(jk)
         }
     stopCluster(cl)
