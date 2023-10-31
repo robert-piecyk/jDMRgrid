@@ -293,7 +293,7 @@ makeMethimpute <- function(
         FASTA.file = FALSE)
     {
     methylome.data <- makeRegionsImpute(
-        df=df, context=context, ref_data=refRegion, mincov=mincov, 
+        df=df, context=context, refRegion=refRegion, mincov=mincov, 
         if.Bismark=if.Bismark, FASTA.file=FASTA.file)
     if (!is.null(methylome.data$counts)) {
         quant.cutoff <- as.numeric(
