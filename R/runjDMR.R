@@ -393,16 +393,13 @@ runjDMRgrid <- function(
     if (parallelApply == TRUE) {
         makeMethimpute_future(
             out.samplelist, merge_list, include.intermediate, out.dir, mincov,
-            if.Bismark, FASTA.file)
-    }
+            if.Bismark, FASTA.file) }
     if (is.numeric(numCores) == TRUE) {
         makeMethimpute_foreach(
             out.samplelist, merge_list, include.intermediate, out.dir, mincov,
-            numCores, if.Bismark, FASTA.file)
-    }
+            numCores, if.Bismark, FASTA.file) }
     if (is.null(numCores) & parallelApply == FALSE) {
         makeMethImpute_normal(
             out.samplelist, merge_list, include.intermediate, out.dir, mincov,
-            if.Bismark, FASTA.file)
-    }
+            if.Bismark, FASTA.file) }
 }
