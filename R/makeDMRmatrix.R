@@ -111,6 +111,12 @@ prepareFlist <- function(context, extractflist, samplelist) {
         } else {
             message(
                 "Multiple files with  match ", mynames[a1]," found!")
+            as$full.path.MethReg <- grep(
+                paste0(
+                    "/", mynames[a1], "_",context, ".txt", sep=""
+                ), extractflist, value = TRUE)
+            message(basename(as$full.path.MethReg)," found!")
+            selectlist[[a1]] <- as
         }
     }
     flist <- rbindlist(selectlist)
