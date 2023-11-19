@@ -446,7 +446,8 @@ filteringAmongContexts <- function(
             removeNonPolymorphicOnly(
                 status.collect = status.collect, 
                 rc.methlevel.collect = rc.methlevel.collect, 
-                context = context, data.dir = data.dir)}
+                context = context, data.dir = data.dir,
+                if.mergingBins = if.mergingBins)}
         # filtering out regions with epiMAF < Minor Allele Frequency
         if (!is.null(epiMAF.cutoff)) {
             populationFiltering(
