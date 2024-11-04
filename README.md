@@ -23,4 +23,5 @@ Please open the [vignette](https://github.com/robert-piecyk/jDMRgrid/blob/master
 ##### Rashmi Hazarika - rashmi.hazarika@tum.de
 ##### Yadi Shahryary - y.shahryary@tum.de
 ##### Frank Johannes - frank@johanneslab.org
+##### Ming Zhou - ming.zhou@tum.de 
 
