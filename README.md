@@ -13,7 +13,7 @@ To install from GitHub (development version), follow the steps given below.
 ```sh
 install.packages("devtools")
 library(devtools)
-devtools::install_github("jlaab-code/jDMR")
+devtools::install_github("jlab-code/jDMRgrid")
 ```
 ## How to use?
 Please open the [vignette](https://github.com/robert-piecyk/jDMRgrid/blob/master/vignettes/manual.pdf) file.
