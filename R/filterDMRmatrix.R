@@ -492,7 +492,7 @@ filterDMRmatrix <- function(
         epiMAF.cutoff = NULL, replicate.consensus = NULL, data.dir, 
         samplelist, if.mergingBins = FALSE) 
 {
-    contexts <- unique(sub("_.*", "", list.files(data.dir, pattern = 'C')))
+    contexts <- unique(sub("_.*", "", list.files(data.dir, pattern = '^C')))
     if (!is.null(samplelist$group)){
         samplelist$name <- paste0(samplelist$sample,"_", samplelist$replicate)
         gps <- samplelist$group[!samplelist$group %in% c('control')]
