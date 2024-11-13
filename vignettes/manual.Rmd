@@ -126,7 +126,7 @@ head(jDMRgrid.out)
 
 ## 3.1 Run "makeDMRmatrix"
 
-This function generates a DMR matrix of state calls, rc.meth.lvls and posterior probabilities for all samples in one dataframe. You need to create a new folder for DMR matrix.
+This function generates a DMR matrix of state calls, rc.meth.lvls and posterior probabilities for all samples in one dataframe.
 
 **samplelist:** DATAFRAME OBJECT containing information about file, sample and replicate. For control/treatment data an additional column specifying the replicates is required.
 
