@@ -227,7 +227,7 @@ runjDMRgrid <- function(out.dir,
             jk = seq_along(out.filelist$context), .combine = "c", .packages = c(
                 'jDMRgrid','magrittr', 'methimpute')) %dopar% 
             {
-                runMethimputeJ(.data$jk)
+                runMethimputeJ(jk)
             }
         stopCluster(cl)
     }
