@@ -470,7 +470,7 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir)
         out1 <- subsetByOverlaps(CG.gr, CHG.gr, invert = TRUE)
         CG.1 <- subsetByOverlaps(out1, CHH.gr, invert = TRUE)
         CG.1 <- as.data.frame(CG.1)
-        CG.1$seqnames <- as.integer(as.character(CG.1$seqnames))
+        CG.1$seqnames <- as.character(CG.1$seqnames)
         CG.only <- CG.out %>% semi_join(CG.1,by = c("seqnames","start","end"))
         DMR.list.out(
             context.df=CG.only,out.name=paste0(tmp.name,"CG-only-DMRs"),
@@ -482,7 +482,7 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir)
         out2 <- subsetByOverlaps(CHG.gr, CG.gr, invert = TRUE)
         CHG.1 <- subsetByOverlaps(out2, CHH.gr, invert = TRUE)
         CHG.1 <- as.data.frame(CHG.1)
-        CHG.1$seqnames <-as.integer(as.character(CHG.1$seqnames))
+        CHG.1$seqnames <- as.character(CHG.1$seqnames)
         CHG.only <- CHG.out %>% semi_join(CHG.1,by=c("seqnames","start","end"))
         DMR.list.out(
             context.df=CHG.only,out.name=paste0(tmp.name,"CHG-only-DMRs"),
@@ -494,7 +494,7 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir)
         out3 <- subsetByOverlaps(CHH.gr, CG.gr, invert = TRUE)
         CHH.1 <- subsetByOverlaps(out3, CHG.gr, invert = TRUE)
         CHH.1 <- as.data.frame(CHH.1)
-        CHH.1$seqnames <-as.integer(as.character(CHH.1$seqnames))
+        CHH.1$seqnames <- as.character(CHH.1$seqnames)
         CHH.only <- CHH.out %>% semi_join(CHH.1,by=c("seqnames","start","end"))
         DMR.list.out(
             context.df=CHH.only, out.name=paste0(tmp.name, "CHH-only-DMRs"),
