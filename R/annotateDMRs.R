@@ -69,7 +69,6 @@ gff3.out <- function(annotation, grangesObj, gff, name, out.dir) {
 #' @importFrom S4Vectors elementMetadata mcols  mcols<-
 #' @importFrom IRanges CharacterList ranges
 #' @importFrom rtracklayer strand
-#' @importFrom Biostrings type
 #' @importFrom methods as
 #' @importFrom rlang .data
 #' @importFrom tidyr unnest
