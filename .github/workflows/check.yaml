@@ -1,0 +1,91 @@
+name: R CMD check and BiocCheck
+
+on:
+  push:
+    branches: [main, master, 'v0.*']
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    name: R CMD check (Bioc ${{ matrix.bioc }})
+    ## Both release and devel must pass. devel was allowed to fail while GRanges
+    ## extending List there broke as.data.frame(); the package works around it now
+    ## (see grToDF) and devel is green, so a regression should block again.
+    strategy:
+      fail-fast: false
+      matrix:
+        bioc: [release, devel]
+        include:
+          - bioc: release
+            image: bioconductor/bioconductor_docker:latest
+          - bioc: devel
+            image: bioconductor/bioconductor_docker:devel
+    container: ${{ matrix.image }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mark the workspace safe for git
+        ## The container runs as a different UID than the one owning the checkout, so
+        ## libgit2 refuses to open the repo ("repository path ... is not owned by current
+        ## user") and BiocCheck's file-size check dies. git's safe.directory opt-out is
+        ## honoured by libgit2, which is what gert/BiocCheck use underneath.
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory '*'
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          ## remotes::install_deps() resolves against CRAN only. Every hard dependency here
+          ## (GenomicRanges, Biostrings, methimpute, rtracklayer, IRanges, S4Vectors) is a
+          ## Bioconductor package, so without the Bioconductor repositories it installs
+          ## nothing, reports success, and the check then fails at install time.
+          options(repos = BiocManager::repositories())
+          ## the container ships BiocManager but not remotes or rcmdcheck
+          BiocManager::install(c("remotes", "rcmdcheck", "BiocCheck"),
+                               ask = FALSE, update = FALSE)
+          remotes::install_deps(dependencies = TRUE, upgrade = "never")
+          ## fail loudly here rather than inside R CMD check
+          hard <- read.dcf("DESCRIPTION", c("Depends", "Imports"))
+          hard <- unlist(strsplit(hard[!is.na(hard)], ","))
+          hard <- trimws(sub("\\(.*", "", hard))
+          hard <- setdiff(hard, c("R", ""))
+          ## Suggests matter too: the vignette is built during the check, and it needs
+          ## BiocStyle. A package used but not declared fails only at vignette-build time.
+          sugg <- read.dcf("DESCRIPTION", "Suggests")
+          sugg <- trimws(sub("\\(.*", "", unlist(strsplit(sugg[!is.na(sugg)], ","))))
+          need <- setdiff(c(hard, sugg), c("R", ""))
+          missing <- need[!vapply(need, requireNamespace, logical(1), quietly = TRUE)]
+          if (length(missing)) stop("not installed: ", paste(missing, collapse = ", "))
+        shell: Rscript {0}
+
+      - name: R CMD check
+        run: |
+          rcmdcheck::rcmdcheck(args = c("--no-manual"), error_on = "error",
+                               check_dir = "check")
+        shell: Rscript {0}
+
+      - name: Show check log
+        if: always()
+        run: |
+          for f in check/*/00check.log check/*/00install.out; do
+            [ -f "$f" ] || continue
+            echo "===== $f ====="
+            cat "$f"
+          done
+        shell: bash
+
+      - name: BiocCheck
+        run: |
+          BiocCheck::BiocCheck(".", `quit-with-status` = FALSE)
+        shell: Rscript {0}
+
+      - name: Upload check results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-results-${{ matrix.bioc }}
+          path: check

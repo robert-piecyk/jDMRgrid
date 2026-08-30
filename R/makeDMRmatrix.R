@@ -3,6 +3,8 @@
 #' single DataFrame; make a list of these two dataframes
 #' @param filepath Paths to the methylome outputs for single samples. (char)
 #' @param colm Column indices to be included in the final dataset. (num)
+#' @param if.Bismark Whether the inputs were Bismark CX reports; controls how sample
+#'   names are derived from file paths. (logical)
 #' @param include.intermediate Logical if intermediate calls should be used;
 #'                             default as FALSE. (logical)
 #' @import magrittr
@@ -67,6 +69,10 @@ write.out <- function(out.df, data.dir, out.name, contexts) {
 #' @return Saved DMR matrix in output directory for a given context and type
 #' 
 writeDMRmatrix <- function(data, data.type, flist, out.dir, context) {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     for (a in 4:ncol(data)) {
         for (n in seq_along(flist$name)) {
             if (colnames(data)[a] ==  basename(flist$full.path.MethReg)[n]) {
@@ -92,35 +98,43 @@ writeDMRmatrix <- function(data, data.type, flist, out.dir, context) {
 #' @importFrom data.table rbindlist
 #' @return Path to the methylome input files matching a given context
 #' 
-prepareFlist <- function(context, extractflist, samplelist) {
-    mynames <- gsub(
-        paste0("_", context,".txt$"), "", basename(extractflist))
-    selectlist <- list()
-    message("Extracting filenames and matching them...")
-    for (a1 in seq_along(mynames)){
-        pat1 <- paste0(
-            "_",mynames[a1],"_","|","_",mynames[a1],"|",mynames[a1])
-        as <- samplelist[grepl(pat1, samplelist$file),]
-        if (NROW(as)==1){
-            as$full.path.MethReg <- grep(
-                paste0(
-                    "/", mynames[a1], "_",context, ".txt", sep=""
-                    ), extractflist, value = TRUE)
-            message(basename(as$full.path.MethReg)," found!")
-            selectlist[[a1]] <- as
-        } else {
-            message(
-                "Multiple files with  match ", mynames[a1]," found!")
-            as$full.path.MethReg <- grep(
-                paste0(
-                    "/", mynames[a1], "_",context, ".txt", sep=""
-                ), extractflist, value = TRUE)
-            message(basename(as$full.path.MethReg)," found!")
-            selectlist[[a1]] <- as
-        }
-    }
-    flist <- rbindlist(selectlist)
-    return(flist)
+prepareFlist <- function(context, extractflist, samplelist,
+                         if.Bismark = FALSE) {
+    samplelist <- data.table::as.data.table(samplelist)
+    if (is.null(samplelist$sample))
+        stop("samplelist needs a 'sample' column")
+    if (is.null(samplelist$file))
+        stop("samplelist needs a 'file' column")
+
+    ## FIX: this used to loop over the FILES and regex-grep each derived name against
+    ## samplelist$file. That never consulted the 'sample' column the sheet advertises, the
+    ## pattern contained unescaped regex metacharacters (a derived name such as
+    ## "102F_All.gz" has a "." that matches anything), a zero-match silently produced an
+    ## empty row that surfaced later as "subscript out of bounds", and the multiple-match
+    ## branch did exactly what the single-match branch did.
+    ##
+    ## Now the sample sheet is authoritative: for each row we derive the name runjDMRgrid()
+    ## would have written, match it exactly, and label the column with samplelist$sample.
+    message("Matching state-call files to the samples in the sheet...")
+    want  <- paste0(deriveSampleName(samplelist$file, if.Bismark), "_", context, ".txt")
+    idx   <- match(want, basename(extractflist))
+    gone  <- is.na(idx)
+    if (any(gone))
+        stop("no ", context, " state-call file for sample(s): ",
+             paste(samplelist$sample[gone], collapse = ", "),
+             ". Expected: ", paste(want[gone], collapse = ", "),
+             ". runjDMRgrid() names its outputs from the methylome file path, so the sheet's ",
+             "'file' column must point at the same inputs that produced these calls.")
+    dup <- duplicated(idx)
+    if (any(dup))
+        stop("several samples map to the same state-call file: ",
+             paste(samplelist$sample[dup], collapse = ", "),
+             ". Sample names must be distinct in the sheet.")
+
+    flist <- data.table::copy(samplelist)
+    flist$full.path.MethReg <- extractflist[idx]
+    message("Matched ", nrow(flist), " sample(s) for ", context, ".")
+    flist
 }
 
 #------------------------------------------------------------------------------
@@ -130,26 +144,43 @@ prepareFlist <- function(context, extractflist, samplelist) {
 #' @inheritParams prepareFlist
 #' @inheritParams merge_cols
 #' @inheritParams writeDMRmatrix
-#' @param context Vector of cytosine contexts; default c('CG','CHG','CHH'). 
-#'                (char)
-#' @param postMax.out Logical if DMR matrix with postMax probabilities
-#'                    should be output; default as FALSE. (logical)
-#' @param samplelist DataFrame object containing information about
-#'                   file, sample, replicate and group. (DataFrame object)
-#' @param input.dir Path to the input directory with methylome calls
-#'                  after jDMRgrid function. (char)
-#' @param out.dir Path to the output directory. (char)
-#' @param include.intermediate Logical if intermediate calls should be used;
-#'                             default as FALSE. (logical)
-#' @import magrittr
-#' @importFrom data.table fread fwrite rbindlist
-#' @return Saved state-calls, rc-methylation and postMax DMR matrices
-#'         as txt files.
-#' @export
+#' @param input.dir Path to the directory holding the region-call files written
+#'                  by runjDMRgrid(). (char)
+#' @param contexts Vector of cytosine contexts; default c('CG','CHG','CHH').
+#'                 (char)
+#' @param postMax.out Logical: also write the matrix of posterior probabilities
+#'                     behind each state call. Needed by filterDMRmatrix(min.posterior=)
+#'                     and by rankDMRs(). Costs roughly 35-40 percent more output.
+#'                     (logical; default as TRUE)
+#' @examples
+#' sheet <- get(load(system.file("data", "listFiles2.RData", package = "jDMRgrid")))
+#' sheet$file <- system.file("extdata", sheet$file, package = "jDMRgrid")
+#'
+#' grid <- file.path(tempdir(), "jDMRgrid_grid2")
+#' mat  <- file.path(tempdir(), "jDMRgrid_matrix2")
+#' runjDMRgrid(out.dir = grid, window = 200, step = 50, samplelist = sheet,
+#'             contexts = "CG", min.C = 10, min.C.type = "percentile",
+#'             mincov = 0, include.intermediate = FALSE, runName = "example")
+#' makeDMRmatrix(contexts = "CG", samplelist = sheet,
+#'               input.dir = grid, out.dir = mat, include.intermediate = FALSE)
+#' list.files(mat)
 makeDMRmatrix <- function(
-        contexts=c("CG","CHG","CHH"), postMax.out=FALSE, samplelist,
-        input.dir, out.dir, include.intermediate=FALSE) 
+        contexts=c("CG","CHG","CHH"), postMax.out=TRUE, samplelist,
+        input.dir, out.dir, include.intermediate=FALSE, if.Bismark=FALSE) 
     {
+    ## FIX: with an empty or wrong input.dir this returned quietly having written nothing,
+    ## so a broken pipeline looked like a successful run.
+    if (!dir.exists(input.dir)) stop("input.dir does not exist: ", input.dir)
+    for (cx in contexts) {
+        if (length(list.files(input.dir, pattern = paste0(cx, "\\.txt$"))) == 0L)
+            stop("no per-sample region-call files for context ", cx, " in ", input.dir,
+                 " -- did runjDMRgrid() write state calls? Check that paths in ",
+                 "`samplefiles` resolve.")
+    }
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     for (j in  seq_along(contexts)){
         # list all files in the input directory
         extractflist <- list.files(
@@ -158,7 +189,7 @@ makeDMRmatrix <- function(
             # Prepare flist to read files out of it
             flist <- prepareFlist(
                 context = contexts[j], extractflist = extractflist, 
-                samplelist = samplelist) 
+                samplelist = samplelist, if.Bismark = if.Bismark) 
             # Assign unique names for samples with or without replicate data
             if (!is.null(flist$replicate)) {
                 message(

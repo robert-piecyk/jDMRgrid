@@ -1,12 +1,13 @@
 Package: jDMRgrid
 Type: Package
 Title: A heuristic DMR caller for large-scale WGBS data using grid approach
-Version: 0.2.4
+Version: 0.3.0
 Authors@R: c(
-    person(given = c("Robert", "Stefan"), family = "Piecyk", email = "robert.s.piecyk@gmail.com", role = c("cre","aut"), comment=c(ORCID="0000-0002-7962-2907")),
-    person(given = c("Rashmi", "Rekha"), family = "Hazarika", email = "hazarika.rr@gmail.com", role = "aut"),
-    person(given = "Yadollah", family = c("Shahryary", "Dizaji"), email = "shahryary@gmail.com", role = "aut"),
-    person(given = "Frank", family = "Johannes", email = "frank@jlab.org", role = "aut"))
+    person(given = c("Robert", "Stefan"), family = "Piecyk", email = "robert.s.piecyk@gmail.com", role = c("aut","cre"), comment=c(ORCID="0000-0002-7962-2907")),
+    person(given = c("Rashmi", "Rekha"), family = "Hazarika", email = "hazarika.rr@gmail.com", role = "ctb"),
+    person(given = "Yadollah", family = c("Shahryary", "Dizaji"), email = "shahryary@gmail.com", role = "ctb"),
+    person(given = "Frank", family = "Johannes", email = "frank@jlab.org", role = "ctb"),
+    person(given = "Ming", family = "Zhou", email = "ming.zhou@tum.de", role = "ctb"))
 Description: jDMRgrid is a component of the jDMR toolkit, an essential tool for conducting efficient and heuristic DMR (Differentially Methylated Region) calling in large-scale epigenomic studies involving population-level analyses and control/treatment experiments. 
     Its functionality relies on a grid-based methodology that involves dividing the genome into sliding windows or bins of customizable sizes. 
     It determines methylation state calls for each individual sliding window based on a Hidden Markov Model (HMM) approach. 
@@ -21,6 +22,8 @@ Depends:
 Imports: 
     ape (>= 5.6.3),
     GenomicRanges (>= 1.38.0),
+    GenomeInfoDb (>= 1.22.0),
+    BiocGenerics (>= 0.32.0),
     R.utils (>= 2.10.1),
     data.table (>= 1.10),
     Biostrings (>= 2.40),
@@ -45,9 +48,10 @@ Imports:
     methods,
     parallel,
     rlang
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.3
 VignetteBuilder: knitr
 Suggests: 
+    BiocStyle,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0)

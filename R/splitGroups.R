@@ -17,6 +17,10 @@
 saveSplitDataset <- function(
         input.dir, context, gp1, gp2, out.dir, out.name, type.name)
 {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     fname <- paste0(input.dir, '/', context, type.name)
     if (file.exists(fname)) {
         data <- fread(fname)
@@ -44,12 +48,40 @@ saveSplitDataset <- function(
 #' @importFrom dplyr inner_join
 #' @return DMR matrices split by sample/treatment groups, saved in the same
 #'         directory with DMR matrices.
+#' @examples
+#' ## a small DMR matrix, written to a temporary directory
+#' d <- file.path(tempdir(), "jDMRgrid_example")
+#' dir.create(d, showWarnings = FALSE)
+#' co  <- data.frame(seqnames = 1L, start = c(1L, 201L, 401L), end = c(200L, 400L, 600L))
+#' smp <- c("WT_rep1", "WT_rep2", "mutant1_rep1", "mutant1_rep2")
+#' st  <- rbind(c(1, 1, 0, 0), c(0, 0, 1, 1), c(1, 1, 1, 1))
+#' mk  <- function(nm, M) {
+#'     x <- data.frame(co, M)
+#'     names(x) <- c("seqnames", "start", "end", smp)
+#'     data.table::fwrite(x, file.path(d, nm), sep = "\t")
+#' }
+#' mk("CG_StateCalls.txt", st)
+#' mk("CG_rcMethlvl.txt", st * 0.9)
+#' mk("CG_postMax.txt", matrix(0.99, 3, 4))
+#'
+#' sheet <- data.frame(
+#'     file = NA_character_, sample = rep(c("WT", "mutant1"), each = 2),
+#'     replicate = rep(c("rep1", "rep2"), 2),
+#'     group = rep(c("control", "treatment1"), each = 2), stringsAsFactors = FALSE)
+#'
+#' ## one matrix per pairwise comparison
+#' splitGroups(samplelist = sheet, contexts = "CG", input.dir = d, out.dir = d)
+#' list.files(d, pattern = "WT_mutant1")
 #' @export
 #'
 splitGroups <- function(
-        samplelist, postMax.out=FALSE, contexts=c("CG","CHG","CHH"), input.dir,
+        samplelist, postMax.out=TRUE, contexts=c("CG","CHG","CHH"), input.dir,
         out.dir)
 {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     samplelist$name <- paste0(samplelist$sample,"_", samplelist$replicate)
     gps <- samplelist$group[!samplelist$group %in% c('control')]
     gps <- unique(gps)

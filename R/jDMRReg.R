@@ -99,17 +99,20 @@ modified.estimateTransDist <- function(distcor, skip, plot.parameters=TRUE) {
         params.list[paste0(df$from, '-', df$to)], 
         function(x) round(x$D, 0), numeric(1))
     df$params <- paste0("a0 = ", df$a0, ", D = ", df$D)
-    ggplt <- ggplot(df) + theme_bw() + geom_line(aes_string(
-        x='distance', y='correlation', alpha='logweight'))
-    ggplt <- ggplt + geom_line(aes_string(
-        x='distance', y='correlation.fit'), col='blue')
+    ## aes_string() was deprecated in ggplot2 3.0.0 and warns from 3.4 on. Tidy evaluation
+    ## with .data[[ ]] is the supported replacement and behaves identically here.
+    ggplt <- ggplot(df) + theme_bw() + geom_line(aes(
+        x = .data[['distance']], y = .data[['correlation']],
+        alpha = .data[['logweight']]))
+    ggplt <- ggplt + geom_line(aes(
+        x = .data[['distance']], y = .data[['correlation.fit']]), col = 'blue')
     if (plot.parameters) {
         if (any(!is.na(df$correlation))) {
             max_corr <- max(df$correlation, na.rm = TRUE)
             max_dist <- max(df$distance, na.rm = TRUE)
             
             ggplt <- ggplt + geom_text(
-                aes_string(label='params'), x = max_dist, y = max_corr, 
+                aes(label = .data[['params']]), x = max_dist, y = max_corr,
                 vjust = 1, hjust = 1)
         } else {
             message("No non-missing values in df$correlation.")
@@ -118,8 +121,8 @@ modified.estimateTransDist <- function(distcor, skip, plot.parameters=TRUE) {
     ggplt <- ggplt + xlab('distance in [bp]')
     ggplt <- ggplt + facet_grid(from ~ to)
     if (miny < 0) {
-        ggplt <- ggplt + geom_hline(aes_string(
-            'yintercept'=0), linetype=2, alpha=0.5)
+        ggplt <- ggplt + geom_hline(
+            yintercept = 0, linetype = 2, alpha = 0.5)
     }
     transDist <- vapply(params.list, function(x) x$D, numeric(1))
     return(list(transDist=transDist, plot=ggplt))
@@ -136,6 +139,10 @@ modified.estimateTransDist <- function(distcor, skip, plot.parameters=TRUE) {
 #' @return 
 #' 
 modifiedExportMethylome <- function(model, out.dir, context, name) {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     #data <- model$data
     data <- model
     final_dataset <- as(data, 'data.frame')
@@ -187,7 +194,7 @@ findMethylatedOrUnmethylated <- function(overlaps, overlaps.hits, data_gr)
         overlaps.hits$total, list(subjectHits(overlaps)), FUN=sum)
     if (NROW(methylated) != NROW(counts) ){
         missingr <- which(
-            !rownames(data.frame(data_gr)) %in% methylated$Group.1)
+            !as.character(seq_along(data_gr)) %in% methylated$Group.1)
         methylated <- bind_rows(
             data.frame(Group.1=missingr, x=0), methylated)
         methylated <- methylated[order(methylated$Group.1),]
@@ -218,7 +225,7 @@ findMethylatedOrUnmethylated <- function(overlaps, overlaps.hits, data_gr)
 #' @importFrom stats aggregate
 #' @importFrom dplyr bind_rows
 #' @importFrom methimpute importBismark extractCytosinesFromFASTA 
-#' @importFrom mehtimpute inflateMethylome
+#' @importFrom methimpute inflateMethylome
 #' @return
 #' 
 makeRegionsImpute <- function(
@@ -231,7 +238,7 @@ makeRegionsImpute <- function(
         ref_data <- importBismark(df)
         cytosine.positions <- cyt.pos.all[cyt.pos.all$context == context]
         ref_data <- inflateMethylome(ref_data, cytosine.positions)
-        ref_data <- as.data.frame(ref_data)
+        ref_data <- grToDF(ref_data)
         ref_data <- ref_data[,-c(3,4)]
         colnames(ref_data) <- c('V1','V2','V3','V4','V5','V6')
     } else {
@@ -291,6 +298,10 @@ makeMethimpute <- function(
         probability, out.dir, name, mincov, if.Bismark, 
         cyt.pos.all)
     {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     methylome.data <- makeRegionsImpute(
         df=df, context=context, refRegion=refRegion, mincov=mincov, 
         if.Bismark=if.Bismark, cyt.pos.all=cyt.pos.all)

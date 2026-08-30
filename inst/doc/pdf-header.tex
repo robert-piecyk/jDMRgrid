@@ -1,0 +1,11 @@
+% The DMR matrices carry one column per sample, and the toy sample names are long
+% ("methylomeA_rep1"), so those tabulars run past the text block by up to 82pt. Shrink the
+% table body font and column padding. Hooking `tabular` is what matters -- hooking the `table`
+% float has no effect, because the float's own box is not what overflows.
+%
+% Note: BiocStyle deliberately overhangs table CAPTIONS by marginparwidth (30mm = 85.36pt)
+% into its wide right margin, so pdflatex reports one "Overfull \hbox (85.35825pt too wide)"
+% per captioned table. Those are by design and stay on the page (caption ends at 563pt of a
+% 614pt sheet); do not try to "fix" them.
+\usepackage{etoolbox}
+\AtBeginEnvironment{tabular}{\footnotesize\setlength{\tabcolsep}{3pt}}

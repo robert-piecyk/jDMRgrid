@@ -31,6 +31,10 @@ gff3.in <- function(gff){
 #' @return Export output files in gff3 format
 #' 
 gff3.out <- function(annotation, grangesObj, gff, name, out.dir) {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     getgff3 <- lapply(annotation, function(x){
         idx <- which(elementMetadata(gff)[,"type"] == x)
         gff <- gff[idx,]
@@ -56,12 +60,11 @@ gff3.out <- function(annotation, grangesObj, gff, name, out.dir) {
 #' @param mygr GenomicRanges object with set of regions/DMRs 
 #'             (GenomicRanges object)
 #' @import magrittr
-#' @importFrom dplyr mutate id
+#' @importFrom dplyr mutate
 #' @importFrom GenomicRanges findOverlaps subsetByOverlaps seqnames
 #' @importFrom S4Vectors elementMetadata mcols  mcols<-
 #' @importFrom IRanges CharacterList ranges
 #' @importFrom rtracklayer strand
-#' @importFrom Biostrings type
 #' @importFrom methods as
 #' @importFrom rlang .data
 #' @importFrom tidyr unnest
@@ -126,6 +129,10 @@ annotate <- function(getAnno, mygff, mygr){
 writeTxtAnnotations <- function(
         d, gr, annotation, tmp.name, out.dir)
 {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     anno.list <- list()
     final.df <- list()
     out <- d %>%
@@ -184,9 +191,26 @@ writeTxtAnnotations <- function(
 #' @importFrom IRanges IRanges
 #' @importFrom data.table fread rbindlist
 #' @return Output files containing annotated DMRs and DMR counts table
+#' @examples
+#' ## any file with chromosome, start and end can be annotated
+#' ind <- file.path(tempdir(), "jDMRgrid_toannotate")
+#' dir.create(ind, showWarnings = FALSE)
+#' data.table::fwrite(
+#'     data.frame(seqnames = 1L, start = c(2131L, 8736L), end = c(3630L, 10237L)),
+#'     file.path(ind, "CG_regions.txt"), sep = "\t")
+#'
+#' gff <- system.file("extdata/toyData", "TAIR10_promoters.gff3", package = "jDMRgrid")
+#' outd <- file.path(tempdir(), "jDMRgrid_annot")
+#' annotateDMRs(annotation = "promoters", gff.files = gff, if.gff3 = FALSE,
+#'              input.dir = ind, out.dir = outd)
+#' list.files(outd)
 #' @export
 #' 
 annotateDMRs <- function(annotation, gff.files, if.gff3, input.dir, out.dir) {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     file.list <- list.files(input.dir, pattern="*.txt", full.names = TRUE)
     for (i in seq_along(file.list)){
         message("Running file ", file.list[i])

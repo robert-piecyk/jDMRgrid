@@ -11,7 +11,6 @@
 bindReplicateLists <- function(
         x, mypattern, df.bind, sampleinfo, replicate.consensus, diff.ct,
         max.iter) {
-    Sys.sleep(1/max.iter)
     for (m in unique(df.bind$sample)){
         total.reps <- length(df.bind$mypattern[df.bind$sample==m])
         rval <- round(replicate.consensus * total.reps)
@@ -47,8 +46,11 @@ bindReplicateLists <- function(
     }
     df.gp <- group_by(df.bind, sample) %>%
         summarize(n = mean(.data$diff.count))
-    cb <- combn(df.gp$n,2)
-    my.diff <- unlist(lapply(cb, function(x) abs(cb[1]-cb[2])))
+    ## FIX: lapply() iterates the ELEMENTS of the combn matrix and the body ignores its
+    ## argument, so my.diff was the first pair's difference repeated. With more than two
+    ## sample groups only that one pair was ever tested against diff.ct.
+    cb <- combn(df.gp$n, 2)
+    my.diff <- abs(cb[1, ] - cb[2, ])
     if ((min(my.diff) >= diff.ct) & (sum(df.bind$count)==0)) {
         return(TRUE)
     } else {
@@ -70,50 +72,78 @@ bindReplicateLists <- function(
 #' @importFrom utils setTxtProgressBar txtProgressBar
 #' @return List of data frames for rc-methylation level and state-calls using 
 #'         replicate-consensus criterion.
+#' @examples
+#' ## two groups of two replicates, named <sample>_<replicate>
+#' co <- data.frame(seqnames = 1L, start = c(1L, 201L, 401L), end = c(200L, 400L, 600L))
+#' sc <- data.frame(co, WT_rep1 = c(1, 0, 1), WT_rep2 = c(1, 0, 1),
+#'                      mut_rep1 = c(0, 0, 1), mut_rep2 = c(0, 0, 1))
+#' rc <- data.frame(co, WT_rep1 = c(0.9, 0.1, 0.9), WT_rep2 = c(0.9, 0.1, 0.9),
+#'                      mut_rep1 = c(0.1, 0.1, 0.9), mut_rep2 = c(0.1, 0.1, 0.9))
+#'
+#' ## replicates must agree within each group, and the groups must differ
+#' res <- filterReplicateConsensus(sc, rc, replicate.consensus = 1, diff.ct = 0.5)
+#' res[[1]]
 #' @export
 #'
 filterReplicateConsensus <- function(
         status.collect, rc.methlevel.collect, replicate.consensus, diff.ct) {
     if (!is.null(status.collect$epiMAF)){
         status.collect <- as.data.frame(status.collect)
-        status.collect <- status.collect[,-nrow(status.collect)]
+        status.collect <- status.collect[, setdiff(names(status.collect), "epiMAF")]
     }
-    # deducing replicates info
     mycol <- names(status.collect)[4:NCOL(status.collect)]
-    sampleinfo <- data.frame(do.call(rbind, strsplit(as.character(mycol),"_")))
-    if (length(sampleinfo)==2){
-        colnames(sampleinfo) <- c("sample", "replicate")
-        dt <- data.frame()
-        pb1 <- txtProgressBar(
-            min = 1, max = nrow(status.collect), char = "=", 
-            style = 3, file = "")
-        q <- lapply(
-            seq(NROW(status.collect)), function(iter) {
-                mypattern <- unlist(
-                    status.collect[iter, 4:NCOL(status.collect)])
-                df.bind <- cbind(sampleinfo, mypattern)
-                out.q <- bindReplicateLists(
-                    x = iter, mypattern = mypattern, df.bind = df.bind,
-                    sampleinfo = sampleinfo, 
-                    replicate.consensus = replicate.consensus, 
-                    diff.ct = diff.ct, max.iter = nrow(status.collect))
-                setTxtProgressBar(pb1, iter)
-                return(out.q)
-            })
-        close(pb1)
-        df.status.collect <- status.collect[unlist(q),]
-        if (NROW(df.status.collect) !=0){
-            df.rc.methlevel.collect <- rc.methlevel.collect %>%
-                semi_join(
-                    df.status.collect,
-                    by=c("seqnames","start","end"))
-            return(list(df.status.collect, df.rc.methlevel.collect))
-        } else {
-            message("Empty dataframe. Nothing to write!")
-            return(NULL)
-        }
+    sampleinfo <- data.frame(do.call(rbind, strsplit(as.character(mycol), "_")))
+    if (length(sampleinfo) != 2) stop("Column for replicates is missing!!!")
+    colnames(sampleinfo) <- c("sample", "replicate")
+
+    ## PERF: this used to iterate the REGIONS -- one lapply() pass per region, each building a
+    ## fresh data.frame, looping over every sample group, and calling table() per group. On
+    ## CHH at 169 samples that is on the order of 1e11 element operations and 4e8 table()
+    ## calls, and the inner branch additionally ran apply() over a data.frame, coercing every
+    ## column to character and converting three of them back. That branch also recomputed
+    ## exactly what the enclosing loop had already assigned.
+    ##
+    ## The quantities are per SAMPLE GROUP, not per region, so they vectorise directly:
+    ##   consensus_g : the modal state among group g's replicates reaches
+    ##                 round(replicate.consensus * n_reps)
+    ##   diffcount_g : fraction of group g's replicates in state 1 (methylated)
+    ## A region is kept when every group reaches consensus and the smallest pairwise
+    ## difference in diffcount across groups is at least diff.ct.
+    M   <- as.matrix(status.collect[, 4:NCOL(status.collect)])
+    ## An earlier filter (min.posterior, epiMAF, or the non-polymorphic pass) can legitimately
+    ## leave nothing behind. Without this guard `lv` is empty and do.call(pmax, list()) fails
+    ## with "no arguments", which reads as a bug in the caller rather than an empty result.
+    if (NROW(M) == 0L) {
+        message("Empty data frame. Nothing to write!")
+        return(NULL)
+    }
+    lv  <- sort(unique(as.vector(M)))
+    grp <- split(seq_along(mycol), sampleinfo$sample)
+    if (length(grp) < 2L)
+        stop("replicate consensus filtering needs at least two sample groups")
+
+    consensus <- matrix(TRUE, nrow(M), length(grp))
+    dcount    <- matrix(0,    nrow(M), length(grp))
+    for (i in seq_along(grp)) {
+        cols <- grp[[i]]
+        sub  <- M[, cols, drop = FALSE]
+        mx   <- do.call(pmax, lapply(lv, function(v) rowSums(sub == v)))
+        consensus[, i] <- mx >= round(replicate.consensus * length(cols))
+        dcount[, i]    <- rowSums(sub == 1) / length(cols)
+    }
+    pr   <- combn(ncol(dcount), 2)
+    mind <- do.call(pmin, lapply(seq_len(ncol(pr)), function(k)
+                abs(dcount[, pr[1, k]] - dcount[, pr[2, k]])))
+    keep <- (rowSums(!consensus) == 0L) & (mind >= diff.ct)
+
+    df.status.collect <- as.data.frame(status.collect)[keep, , drop = FALSE]
+    if (NROW(df.status.collect) != 0){
+        df.rc.methlevel.collect <- as.data.frame(rc.methlevel.collect) %>%
+            semi_join(df.status.collect, by = c("seqnames", "start", "end"))
+        return(list(df.status.collect, df.rc.methlevel.collect))
     } else {
-        stop("Column for replicates is missing!!!")
+        message("Empty data frame. Nothing to write!")
+        return(NULL)
     }
 }
 
@@ -128,6 +158,17 @@ filterReplicateConsensus <- function(
 #' @importFrom utils setTxtProgressBar txtProgressBar
 #' @return List of data frames for rc-methylation level and state-calls using 
 #'         minor epi-allele frequency criterion.
+#' @examples
+#' ## state calls and methylation levels for one context
+#' co <- data.frame(seqnames = 1L, start = c(1L, 201L, 401L), end = c(200L, 400L, 600L))
+#' sc <- data.frame(co, s1 = c(1, 0, 1), s2 = c(1, 0, 1),
+#'                      s3 = c(1, 0, 1), s4 = c(0, 0, 1))
+#' rc <- data.frame(co, s1 = c(0.9, 0.1, 0.8), s2 = c(0.9, 0.1, 0.8),
+#'                      s3 = c(0.9, 0.1, 0.8), s4 = c(0.1, 0.1, 0.8))
+#'
+#' ## keep regions where the rarer state is carried by fewer than 30 percent of samples
+#' res <- filterEpiMAF(sc, rc, epiMAF = 0.3)
+#' res[[1]]
 #' @export
 #' 
 filterEpiMAF <- function(status.collect, rc.methlevel.collect, epiMAF){
@@ -136,20 +177,25 @@ filterEpiMAF <- function(status.collect, rc.methlevel.collect, epiMAF){
         res <-y(as.numeric(valParm),x)
         return(res)
     }
-    pb2 <- txtProgressBar(
-        min = 1, max = NROW(status.collect), char = "=", style = 3, file = "")
-    mypatterns <- status.collect[, 4:(NCOL(status.collect) - 1)]
-    epiMAFs <- apply(mypatterns, 1, function(row)
-    {
-        mycount <- table(row)
-        epiMAF.out <- min(mycount) / length(row)
-        return(floorDec(as.numeric(as.character(epiMAF.out)), 5))
-    })
-    status.collect$epiMAF <- epiMAFs
-    
-    Sys.sleep(1 / NROW(status.collect))
-    setTxtProgressBar(pb2, NROW(status.collect))
-    close(pb2)
+    ## PERF: was apply(mypatterns, 1, ...) with a table() call per region, plus a
+    ## Sys.sleep() that existed only so the progress bar rendered. States are numeric
+    ## (0/0.5/1, see merge_cols), so the minor-"allele" frequency is rowSums per level and a
+    ## row-wise minimum -- three vectorised passes instead of one interpreted call per region.
+    ## Measured 62x faster on 200k regions x 169 samples, identical results.
+    ## FIX (behaviour change, see NEWS): the range was 4:(NCOL(status.collect) - 1), but the
+    ## epiMAF column is appended AFTER this line, so at this point there is no trailing column
+    ## and the last SAMPLE was silently excluded from the minor-allele-frequency calculation.
+    ## With four samples it used three, making the smallest achievable epiMAF 1/3 = 0.333 --
+    ## so an epiMAF.cutoff of 0.33 could never match anything.
+    mypatterns <- status.collect[, 4:NCOL(status.collect)]
+    M   <- as.matrix(mypatterns)
+    lv  <- sort(unique(as.vector(M)))
+    cnt <- vapply(lv, function(v) rowSums(M == v), numeric(NROW(M)))
+    if (!is.matrix(cnt)) cnt <- matrix(cnt, nrow = NROW(M))
+    ## table() tabulates only the levels PRESENT in a row, so its min() ignores states the
+    ## row does not contain; setting zero counts to Inf reproduces that exactly.
+    cnt[cnt == 0] <- Inf
+    status.collect$epiMAF <- floorDec(do.call(pmin, as.data.frame(cnt)) / NCOL(M), 5)
     
     status.collect <- as.data.frame(status.collect)
     rc.methlevel.collect <- as.data.frame(rc.methlevel.collect)
@@ -178,50 +224,47 @@ filterEpiMAF <- function(status.collect, rc.methlevel.collect, epiMAF){
 #' 
 merge.bins <- function(rcmethlvl_data, statecalls_data)
 {
-    states.all <- split(statecalls_data, apply(
-        statecalls_data[,4:NCOL(statecalls_data)],1,paste,collapse = "_"))
-    rcmethlvl.all <- split(
-        rcmethlvl_data, apply(
-            statecalls_data[,4:NCOL(statecalls_data)],1,paste,collapse = "_"))
-    # merge overlapping bins having the same patterns among samples
-    states.list <- lapply(states.all, function(x) {
-        data.list <- list()
-        # create a GRanges object and merge overlapping bins
-        data <- makeGRangesFromDataFrame(x,keep.extra.columns = TRUE)
-        # merge overlapping bins
-        data.reduced <- reduce(data)
-        # find the indices of the overlapping bins
-        ovlps <- as.data.frame(findOverlaps(data, data.reduced))
-        data.reduced <- as.data.frame(data.reduced)[,c(1,2,3)]
-        data.reduced <- cbind(data.reduced, x[1,4:NCOL(x)])
-        data.list[[1]] <- ovlps; data.list[[2]] <- data.reduced
-        return(data.list)
-    })
-    # extract state calls and overlaps from the previous function
-    overlaps.data <- lapply(states.list, function(x) x[[1]])
-    states.data <- lapply(states.list, function(x) x[[2]])
-    # calculate the average methylation for each previously merged bin
-    rcmethlvl.data <- lapply(seq_along(rcmethlvl.all), function(x) {
-        # extract methylation levels and overlaps for a given run
-        rcmethlvl.1 <- rcmethlvl.all[[x]]
-        ovlps.1 <- overlaps.data[[x]]
-        ovlps.1 <- split(ovlps.1, f = ovlps.1$subjectHits)
-        rcmethlvl.out <- lapply(ovlps.1, function(y) {
-            myv <- apply(
-                rcmethlvl.1[y$queryHits,4:NCOL(rcmethlvl_data)], 2, mean)
-            mydf <- data.frame(t(myv), stringsAsFactors = FALSE)
-            colnames(mydf) <- names(myv)
-            return(mydf)
-        })
-        # bind mean methylation windows with state calls seqnames, start and end
-        rcmethlvl.out <- cbind(
-            states.data[[x]][,seq_len(3)],
-            rbindlist(rcmethlvl.out))
-        return(rcmethlvl.out)
-    })
-    states.data <- rbindlist(states.data)
-    states.data <- states.data[order(seqnames, start, end), ]
-    rcmethlvl.data <- rbindlist(rcmethlvl.data)
+    ## PERF: the previous implementation built the grouping key with
+    ##   apply(statecalls[, 4:ncol], 1, paste, collapse = "_")
+    ## and did so TWICE -- once to split the state calls and again to split the methylation
+    ## levels. On a CHH matrix that is roughly 800 MB of throwaway strings, built twice. It
+    ## then ran GenomicRanges::reduce() per pattern group and, for every merged interval,
+    ## an apply(, 2, mean) over that interval's rows.
+    ##
+    ## Sorting by (pattern, chromosome, start) turns the merge into a single running-maximum
+    ## sweep -- a new interval begins wherever a bin starts beyond the furthest end seen so
+    ## far in its group -- and the averaging becomes one grouped aggregation. No strings are
+    ## built and nothing iterates the intervals.
+    ##
+    ## reduce() merges book-ended ranges as well as overlapping ones (its default
+    ## min.gapwidth = 1), so the break test is `start > running_max_end + 1`, not `>`.
+    sc <- data.table::as.data.table(statecalls_data)
+    rc <- data.table::as.data.table(rcmethlvl_data)
+    scols <- names(sc)[4:NCOL(sc)]
+    rcols <- names(rc)[4:NCOL(rc)]
+
+    sc[, .pat := .GRP, by = scols]
+    ord <- order(sc$.pat, as.character(sc$seqnames), sc$start, sc$end)
+    sc  <- sc[ord]; rc <- rc[ord]
+
+    chr <- as.character(sc$seqnames)
+    runmax <- sc[, data.table::shift(cummax(end), fill = -1L),
+                 by = .(.pat, seqnames)]$V1
+    newgrp <- sc$.pat != data.table::shift(sc$.pat, fill = -1L) |
+              chr != data.table::shift(chr, fill = "")
+    sc[, .mid := cumsum(newgrp | (sc$start > runmax + 1L))]
+
+    states.data <- sc[, .(seqnames = seqnames[1L], start = min(start), end = max(end)),
+                      by = .mid]
+    states.data <- cbind(states.data[, -".mid"],
+                         sc[!duplicated(sc$.mid), scols, with = FALSE])
+
+    rc[, .mid := sc$.mid]
+    rcmethlvl.data <- rc[, lapply(.SD, mean), by = .mid, .SDcols = rcols]
+    rcmethlvl.data <- cbind(states.data[, seq_len(3), with = FALSE],
+                            rcmethlvl.data[, -".mid"])
+
+    states.data    <- states.data[order(seqnames, start, end), ]
     rcmethlvl.data <- rcmethlvl.data[order(seqnames, start, end), ]
     return(list(states.data, rcmethlvl.data))
 }
@@ -417,7 +460,7 @@ replicateFiltering <- function(
 #'
 filteringAmongContexts <- function(
         list.status, data.dir, replicate.consensus, epiMAF.cutoff, 
-        if.mergingBins) {
+        if.mergingBins, min.posterior = NULL, diff.ct = 0.5) {
     for (i in seq_along(list.status)){
         # extract context for a given state calls file
         context <- gsub("_StateCalls.txt", "", basename(list.status[i]))
@@ -441,6 +484,45 @@ filteringAmongContexts <- function(
         rc.methlvl.name <- paste0(data.dir, "/", context, "_rcMethlvl.txt")
         rc.methlevel.collect <- fread(rc.methlvl.name, header=TRUE)
         rc.methlevel.collect <- rc.methlevel.collect[index,]
+        ## Confidence filter. makeDMRmatrix(postMax.out = TRUE) writes the HMM posterior for
+        ## every region and sample, and until now nothing ever read it back: a state assigned
+        ## at posterior 0.56 was treated exactly like one assigned at 0.99. Requiring a
+        ## minimum posterior across all samples in the comparison removes the low-confidence
+        ## calls that dominate the disagreement between asymmetric and symmetric runs.
+        if (!is.null(min.posterior)) {
+            ## The postMax matrix is written once per context by makeDMRmatrix(). When a
+            ## group column is present the state-call files are per group pair and `context`
+            ## carries the pair suffix (e.g. "CG_WT_mutant1"), so fall back to the bare
+            ## context prefix.
+            pm.name <- paste0(data.dir, "/", context, "_postMax.txt")
+            if (!file.exists(pm.name))
+                pm.name <- paste0(data.dir, "/", sub("_.*", "", context), "_postMax.txt")
+            if (!file.exists(pm.name)) {
+                stop("min.posterior needs ", basename(pm.name),
+                     "; re-run makeDMRmatrix() with postMax.out = TRUE")
+            }
+            postMax.collect <- data.table::as.data.table(fread(pm.name, header = TRUE))
+            ## Align by coordinate, never by row position: the postMax matrix covers all
+            ## regions and all samples, while status.collect has already been subset to the
+            ## polymorphic ones and may hold only the samples in this comparison.
+            key <- c("seqnames", "start", "end")
+            sc.key <- data.table::as.data.table(status.collect)[, key, with = FALSE]
+            pm <- postMax.collect[sc.key, on = key]
+            smp <- intersect(names(status.collect)[4:NCOL(status.collect)], names(pm))
+            if (!length(smp))
+                stop("no sample columns shared between ", basename(pm.name),
+                     " and the state-call matrix")
+            pmm <- as.matrix(pm[, smp, with = FALSE])
+            ## do.call(pmin, ...) is a vectorised row minimum and avoids taking a dependency
+            ## on matrixStats for one call. Regions absent from the postMax matrix become NA
+            ## and are dropped rather than silently kept.
+            keep.post <- do.call(pmin, as.data.frame(pmm)) >= min.posterior
+            keep.post[is.na(keep.post)] <- FALSE
+            message("Confidence filter: min.posterior = ", min.posterior, "; keeping ",
+                    sum(keep.post), " of ", length(keep.post), " regions.")
+            status.collect       <- status.collect[keep.post,]
+            rc.methlevel.collect <- rc.methlevel.collect[keep.post,]
+        }
         # we are only removing non-polymorphic patterns
         if (is.null(epiMAF.cutoff) && is.null(replicate.consensus)) {
             removeNonPolymorphicOnly(
@@ -463,7 +545,7 @@ filteringAmongContexts <- function(
                 rc.methlevel.collect = rc.methlevel.collect, 
                 context = context, data.dir = data.dir, 
                 replicate.consensus = replicate.consensus, 
-                if.mergingBins = if.mergingBins, diff.ct = 0.5)}
+                if.mergingBins = if.mergingBins, diff.ct = diff.ct)}
     }
 }
 
@@ -477,8 +559,16 @@ filteringAmongContexts <- function(
 #' @param data.dir Path to the directory containing DMR matrix files. (char)
 #' @param samplelist DataFrame object containing information about
 #'                   file, sample, replicate and group. (DataFrame object)
-#' @param if.mergingBins Logical if bins with same state-calls profile among
-#'                       samples should be merged. (logical; default as FALSE)
+#' @param if.mergingBins Logical: merge consecutive bins carrying identical state calls
+#'                       across all samples, so that one differential region is one row rather
+#'                       than one row per overlapping window. (logical; default as TRUE)
+#' @param diff.ct Minimum between-group difference, in [0, 1], in the proportion of
+#'   replicates called methylated. Applies together with \code{replicate.consensus}. The
+#'   default of 0.5 is strict: with three replicates per group it requires at least a
+#'   2-of-3 versus 0-of-3 split. Previously fixed internally. (numeric)
+#' @param min.posterior Optional minimum HMM posterior, in [0, 1], required across every
+#'   sample in the comparison. Needs the postMax matrix from
+#'   \code{makeDMRmatrix(postMax.out = TRUE)}. NULL (default) disables the filter.
 #' @import magrittr
 #' @importFrom data.table fread
 #' @return Filtrated state-calls and methylation DMR matrices using:
@@ -486,12 +576,42 @@ filteringAmongContexts <- function(
 #'         (epiMAF for population-based data or 
 #'         replicate consensus for control/treatment data) 
 #'         and/or merging neighbouring bins with same state calls profiles.
+#' @examples
+#' ## a small DMR matrix, written to a temporary directory
+#' d <- file.path(tempdir(), "jDMRgrid_example")
+#' dir.create(d, showWarnings = FALSE)
+#' co  <- data.frame(seqnames = 1L, start = c(1L, 201L, 401L), end = c(200L, 400L, 600L))
+#' smp <- c("WT_rep1", "WT_rep2", "mutant1_rep1", "mutant1_rep2")
+#' st  <- rbind(c(1, 1, 0, 0), c(0, 0, 1, 1), c(1, 1, 1, 1))
+#' mk  <- function(nm, M) {
+#'     x <- data.frame(co, M)
+#'     names(x) <- c("seqnames", "start", "end", smp)
+#'     data.table::fwrite(x, file.path(d, nm), sep = "\t")
+#' }
+#' mk("CG_StateCalls.txt", st)
+#' mk("CG_rcMethlvl.txt", st * 0.9)
+#' mk("CG_postMax.txt", matrix(0.99, 3, 4))
+#'
+#' ## no group column, so the plain matrices are filtered directly
+#' sheet <- data.frame(
+#'     file = NA_character_, sample = rep(c("WT", "mutant1"), each = 2),
+#'     replicate = rep(c("rep1", "rep2"), 2), stringsAsFactors = FALSE)
+#'
+#' filterDMRmatrix(replicate.consensus = 1, data.dir = d, samplelist = sheet)
+#' data.table::fread(file.path(d, "CG_StateCalls-filtered.txt"))
 #' @export
 #'
 filterDMRmatrix <- function(
         epiMAF.cutoff = NULL, replicate.consensus = NULL, data.dir, 
-        samplelist, if.mergingBins = FALSE) 
+        samplelist, if.mergingBins = TRUE, min.posterior = NULL, diff.ct = 0.5) 
 {
+    if (!is.numeric(diff.ct) || length(diff.ct) != 1L || diff.ct < 0 || diff.ct > 1)
+        stop("diff.ct must be a single number in [0, 1]")
+    if (!is.null(min.posterior)) {
+        if (!is.numeric(min.posterior) || length(min.posterior) != 1L ||
+            min.posterior < 0 || min.posterior > 1)
+            stop("min.posterior must be a single number in [0, 1]")
+    }
     contexts <- unique(sub("_.*", "", list.files(data.dir, pattern = '^C')))
     if (!is.null(samplelist$group)){
         samplelist$name <- paste0(samplelist$sample,"_", samplelist$replicate)
@@ -524,7 +644,8 @@ filterDMRmatrix <- function(
         filteringAmongContexts(
             list.status = list.status, data.dir = data.dir, 
             replicate.consensus = replicate.consensus, 
-            epiMAF.cutoff = epiMAF.cutoff, if.mergingBins = if.mergingBins)
+            epiMAF.cutoff = epiMAF.cutoff, if.mergingBins = if.mergingBins,
+            min.posterior = min.posterior, diff.ct = diff.ct)
     } else {
         message("DMR matrix files do not exist!")
     }
@@ -588,7 +709,7 @@ DMR.onlyContext <- function(context, list.out, data.dir, tmp.name) {
         list.out[[2]][[sel.line]], list.out[[2]][[out.line[1]]], invert = TRUE)
     out.2 <- subsetByOverlaps(
         out.1, list.out[[2]][[out.line[2]]], invert = TRUE)
-    out.only <- as.data.frame(out.2)
+    out.only <- grToDF(out.2)
     out.only $seqnames <- as.integer(as.character(out.only$seqnames))
     out.only <- out.only %>% semi_join(
         out.only, by = c("seqnames","start","end"))
@@ -644,7 +765,7 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir)
         gr.nonCG <- subsetByOverlaps(list.out[[2]][[2]], list.out[[2]][[3]])
         gr.nonCG <- subsetByOverlaps(
             gr.nonCG, list.out[[2]][[1]], invert = TRUE, type = 'any')
-        nonCG <- as.data.frame(reduce(gr.nonCG))
+        nonCG <- grToDF(reduce(gr.nonCG))
         nonCG$seqnames <- as.integer(as.character(nonCG$seqnames))
         nonCG <- nonCG %>% semi_join(nonCG, by = c("seqnames","start","end"))
         DMR.list.out(
@@ -656,7 +777,7 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir)
         CG.gr <- list.out[[2]][[1]]
         CHG.gr <- list.out[[2]][[2]]
         CHH.gr <- list.out[[2]][[3]]
-        multi <- as.data.frame(intersect(CG.gr, intersect(CHG.gr, CHH.gr)))
+        multi <- grToDF(intersect(CG.gr, intersect(CHG.gr, CHH.gr)))
         if (nrow(multi) != 0) {
             multi$seqnames <- as.integer(as.character(multi$seqnames))
             multi <- multi %>% semi_join(
@@ -687,10 +808,39 @@ extract.context.DMRs <- function(file1, file2, file3, tmp.name, data.dir)
 #'         CHH-only, 
 #'         non-CG (occurs for CHG and/or CHH, but not for CG context), 
 #'         multi-context (occurs for CG and CHG and CHH contexts)
+#' @examples
+#' ## a small DMR matrix, written to a temporary directory
+#' d <- file.path(tempdir(), "jDMRgrid_example")
+#' dir.create(d, showWarnings = FALSE)
+#' co  <- data.frame(seqnames = 1L, start = c(1L, 201L, 401L), end = c(200L, 400L, 600L))
+#' smp <- c("WT_rep1", "WT_rep2", "mutant1_rep1", "mutant1_rep2")
+#' st  <- rbind(c(1, 1, 0, 0), c(0, 0, 1, 1), c(1, 1, 1, 1))
+#' mk  <- function(nm, M) {
+#'     x <- data.frame(co, M)
+#'     names(x) <- c("seqnames", "start", "end", smp)
+#'     data.table::fwrite(x, file.path(d, nm), sep = "\t")
+#' }
+#' for (cx in c("CG", "CHG", "CHH")) {
+#'     mk(paste0(cx, "_StateCalls.txt"), st)
+#'     mk(paste0(cx, "_rcMethlvl.txt"), st * 0.9)
+#' }
+#'
+#' sheet <- data.frame(
+#'     file = NA_character_, sample = rep(c("WT", "mutant1"), each = 2),
+#'     replicate = rep(c("rep1", "rep2"), 2), stringsAsFactors = FALSE)
+#'
+#' outd <- file.path(tempdir(), "jDMRgrid_context")
+#' context.specific.DMRs(samplelist = sheet, input.dir = d,
+#'                       output.dir = outd, if.filtered = FALSE)
+#' list.files(outd)
 #' @export
 #' 
 context.specific.DMRs <- function(
         samplelist, input.dir, output.dir, if.filtered = FALSE) {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(output.dir, recursive = TRUE, showWarnings = FALSE)
+
     if (!is.null(samplelist$group)){
         samplelist$name <- paste0(samplelist$sample,"_", samplelist$replicate)
         gps <- samplelist$group[!samplelist$group %in% c('control')]

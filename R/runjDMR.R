@@ -9,6 +9,10 @@
 #'
 export.bins <- function(mylist, out.dir, runName)
 {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     names_mylist <- names(mylist)
     lapply(seq_along(names_mylist), function(z1) {
         names_mylist.1 <- names_mylist[z1]
@@ -42,48 +46,87 @@ export.bins <- function(mylist, out.dir, runName)
 #' @return List of two DataFrame objects with binned genome and statistics 
 #'         how many regions is meeting minC criterion.
 #'
-binGenomeLoop <- function(x1, window, step, gr, cyt_gr, contexts, min.C) {
+binGenomeLoop <- function(x1, window, step, gr, cyt_gr, contexts, min.C,
+                          min.C.type = c("percentile", "count"),
+                          region.mode = c("grid", "cluster-grid", "cluster"),
+                          max.gap = 150L, min.sites = 5L, gap.quantile = 0.9) {
+    min.C.type  <- match.arg(min.C.type)
+    region.mode <- match.arg(region.mode)
     window.size <- window[x1]
-    step.size <- step[x1]
-    # Binning genome
-    binned.g <- slidingWindows(gr, window.size, step.size)
-    message("Binning genome with windows of: ", window.size,
-            "bp and step-size of: ", step.size, "bp.")
-    # Creating a data frame from the binned data
-    dd <- data.frame(unlist(binned.g))
-    names(dd) <- c("chr", "start", "end", "cluster.length", "strand")
-    # Storing the data frame in a list
-    new <- list(dd)
-    names(new) <- as.numeric(as.character(window.size))
-    # Creating a GRange object
-    data_gr <- GRanges(
-        seqnames = dd$chr, ranges = IRanges(
-            start = dd$start, end = dd$end), 
-        clusterlen = dd$cluster.length)
-    # Creating a data frame for bin and step sizes
+    step.size   <- step[x1]
     mydf <- data.frame(bin.size = window.size, step.size = step.size)
-    # Process each context using lapply and combine the results
+
     results <- lapply(contexts, function(cx) {
         message("Extracting cytosines for ", cx, ".")
-        # Filtering cytosines
-        ref_gr <- cyt_gr[which(cyt_gr$context == cx),]
-        # Counting cytosines in GRanges
+        ref_gr <- cyt_gr[which(cyt_gr$context == cx), ]
+
+        ## ---- candidate region space -------------------------------------------------
+        if (region.mode == "grid") {
+            ## uniform tiling of the whole genome (the historical behaviour)
+            binned.g <- slidingWindows(gr, window.size, step.size)
+        } else {
+            ## data-defined candidate space: cluster the cytosines of this context first.
+            gapw <- max.gap
+            if (identical(max.gap, "adaptive")) {
+                d <- diff(sort(GenomicRanges::start(ref_gr)))
+                d <- d[d > 0]
+                gapw <- max(1L, as.integer(stats::quantile(d, gap.quantile,
+                                                           na.rm = TRUE)))
+                message("  adaptive gap for ", cx, ": ", gapw, " bp (q",
+                        gap.quantile, " of inter-cytosine distances)")
+            }
+            ## Cluster on an UNSTRANDED copy. cyt_gr carries the strand of each cytosine,
+            ## and GenomicRanges::reduce() groups within strand, so clustering ref_gr
+            ## directly yields a "+" and a "-" copy of every interval. The duplicate
+            ## coordinates survive into the region table and make methimpute fail while
+            ## compiling results ("each range must have an end that is greater or equal to
+            ## its start minus one"). A cytosine cluster is a genomic interval, not a
+            ## strand-specific one, and "grid" mode is likewise unstranded.
+            ref_u <- ref_gr
+            GenomicRanges::strand(ref_u) <- "*"
+            clus <- GenomicRanges::reduce(ref_u, min.gapwidth = gapw)
+            clus <- clus[countOverlaps(clus, ref_u) >= min.sites]
+            if (length(clus) < 100L)
+                warning("context ", cx, " collapsed to ", length(clus),
+                        " cluster(s) at a gap of ", gapw, " bp. Dense contexts (CHH in ",
+                        "particular) merge into chromosome-scale blocks at a fixed gap; ",
+                        "consider max.gap = \"adaptive\".", call. = FALSE)
+            binned.g <- if (region.mode == "cluster") {
+                ## the clusters themselves are the regions
+                GenomicRanges::GRangesList(clus)
+            } else {
+                ## tile fixed windows, but only inside clusters
+                slidingWindows(clus, window.size, step.size)
+            }
+        }
+        ## grToDF(), not as.data.frame(). On Bioc devel GRanges extends List, so
+        ## as.data.frame() lands in as.data.frame.List, which unlist()s the GRanges and
+        ## errors. grToDF() builds the frame from accessors and works everywhere.
+        dd <- grToDF(unlist(binned.g))
+        names(dd) <- c("chr", "start", "end", "cluster.length", "strand")
+        data_gr <- GRanges(seqnames = dd$chr,
+                           ranges = IRanges(start = dd$start, end = dd$end),
+                           clusterlen = dd$cluster.length)
+
+        ## ---- cytosine-count filter ---------------------------------------------------
         dat.collect <- countOverlaps(data_gr, ref_gr)
-        # Create a empirical distribution of cytosines within bins and
-        # find a threshold based on its min.C percentile
-        #new.dat.collect <- dat.collect[which(dat.collect >= min.C)]
-        new.dat.collect <- dat.collect[which(dat.collect >= as.numeric(
-            quantile(ecdf(dat.collect),min.C/100)))]
-        non.empty.bins <- length(new.dat.collect) / length(dat.collect)
-        # Create a filtrated data frame
-        data.out <- dd[which(dat.collect >= as.numeric(quantile(
-            ecdf(dat.collect),min.C/100))),]
-        return(list(non.empty.bins, data.out))
+        thr <- if (min.C.type == "count") {
+            min.C
+        } else {
+            as.numeric(quantile(ecdf(dat.collect), min.C / 100))
+        }
+        keep <- which(dat.collect >= thr)
+        if (length(keep) == 0L)
+            stop("no regions survived for context ", cx, " (region.mode = \"",
+                 region.mode, "\", min.C = ", min.C, " as ", min.C.type,
+                 "). Downstream HMM fitting cannot proceed on an empty region set; ",
+                 "relax min.C, min.sites, or max.gap.", call. = FALSE)
+        non.empty.bins <- length(keep) / length(dat.collect)
+        list(non.empty.bins, dd[keep, ])
     })
     new.one <- lapply(results, function(x) x[[2]])
     names(new.one) <- paste0(contexts, '_', window.size, '_', step.size)
-    # Add the results to the mydf data frame
-    mydf <- cbind(mydf,data.frame(context = contexts, ratio = unlist(
+    mydf <- cbind(mydf, data.frame(context = contexts, ratio = unlist(
         lapply(results, function(x) x[[1]]))))
     return(list(mydf = mydf, collect.bins = new.one))
 }
@@ -116,8 +159,15 @@ binGenomeLoop <- function(x1, window, step, gr, cyt_gr, contexts, min.C) {
 #'
 binGenome <- function(
         methimputefiles, contexts, window, step, min.C, out.dir, runName,
-        if.Bismark, FASTA.file)
+        if.Bismark, FASTA.file,
+        min.C.type = c("percentile", "count"),
+        region.mode = c("grid", "cluster-grid", "cluster"),
+        max.gap = 150L, min.sites = 5L, gap.quantile = 0.9)
 {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     # message about creating grid
     message('Creating grid...'); cyt.collect <- list()
     # from one of the methIMPUTE file extract all cytosines positions
@@ -150,9 +200,16 @@ binGenome <- function(
     if (length(window) != length(step)) {
         message('Window and step vectors sizes must have same length.')
     } else {
+        min.C.type  <- match.arg(min.C.type)
+        region.mode <- match.arg(region.mode)
+        message("Region mode: ", region.mode,
+                " | min.C interpreted as: ", min.C.type)
         results <- lapply(
             seq_along(window), binGenomeLoop, window = window, step = step, 
-            gr = gr, cyt_gr = cyt_gr, contexts = contexts, min.C = min.C)
+            gr = gr, cyt_gr = cyt_gr, contexts = contexts, min.C = min.C,
+            min.C.type = min.C.type, region.mode = region.mode,
+            max.gap = max.gap, min.sites = min.sites,
+            gap.quantile = gap.quantile)
         out <- rbindlist(lapply(results, function(x) x$mydf))
         out <- out[order(out$context, out$bin.size, out$step.size),]
         fwrite(out,file = paste0(
@@ -194,6 +251,10 @@ makeMethimpute_future <- function(
         out.samplelist, merge_list, include.intermediate, out.dir, mincov,
         if.Bismark, cyt.pos.all)
 {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     plan(multisession)
     info_lapply <- future_lapply(
         seq_along(out.samplelist$context), function(j) {
@@ -244,7 +305,18 @@ makeMethimpute_foreach <- function(
         out.samplelist, merge_list, include.intermediate, out.dir, mincov, 
         numCores, if.Bismark, cyt.pos.all)
 {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     cl <- makeCluster(numCores)
+    ## FIX: cluster workers start fresh R sessions and do NOT inherit the caller's
+    ## .libPaths(). If jDMRgrid is installed outside the default library -- or if an older
+    ## copy sits in it -- the workers silently load a different version, which surfaces as
+    ## "unused arguments" from inside the foreach loop. Propagate the caller's paths.
+    .libs <- .libPaths()
+    parallel::clusterExport(cl, ".libs", envir = environment())
+    parallel::clusterEvalQ(cl, .libPaths(.libs))
     registerDoParallel(cl)
     runMethimputeJ <- function(jj) {
         refRegion <- list(reg.obs = merge_list[[out.samplelist$id[jj]]])
@@ -296,6 +368,10 @@ makeMethImpute_normal <- function(
         out.samplelist, merge_list, include.intermediate, out.dir, mincov,
         if.Bismark, cyt.pos.all)
 {
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     info_lapply <- lapply(seq_along(out.samplelist$context), function(jn) {
         refRegion <- list(reg.obs = merge_list[[out.samplelist$id[jn]]])
         message(
@@ -354,19 +430,71 @@ makeMethImpute_normal <- function(
 #' @importFrom rlang .data
 #' @return Output methylome files for the regions using grid genome from 
 #'         non/sliding window approach.
+#' @param min.C.type How \code{min.C} is interpreted. Has no default and must be given:
+#'   the meaning of \code{min.C} changed between versions and the two readings differ by
+#'   orders of magnitude. \code{"percentile"} (an ECDF
+#'   percentile of the per-window cytosine counts, the behaviour since v0.2.x) or
+#'   \code{"count"} (an absolute number of cytosines, the behaviour of earlier versions).
+#'   The same value means very different things under the two rules -- on A. thaliana at
+#'   \code{min.C = 10} the percentile rule keeps 2 278 082 CG bins and the absolute rule
+#'   1 012 452 -- so state it explicitly when reproducing older analyses. (character)
+#' @param region.mode How candidate regions are defined. \code{"grid"} tiles the whole
+#'   genome uniformly (default, historical behaviour). \code{"cluster-grid"} clusters the
+#'   cytosines of each context first and tiles fixed windows only inside those clusters.
+#'   \code{"cluster"} uses the clusters themselves as regions. (character)
+#' @param max.gap Maximum distance between cytosines within one cluster, in bp, or
+#'   \code{"adaptive"} to derive it per context from \code{gap.quantile} of the observed
+#'   inter-cytosine distances. Cluster modes only. (numeric or character)
+#' @param min.sites Minimum cytosines for a cluster to be kept. Cluster modes only. (numeric)
+#' @param gap.quantile Quantile of inter-cytosine distances used when
+#'   \code{max.gap = "adaptive"}. Lower values give tighter, more numerous clusters. (numeric)
+#' @examples
+#' ## region calls for one context, using the packaged toy data
+#' sheet <- get(load(system.file("data", "listFiles2.RData", package = "jDMRgrid")))
+#' sheet$file <- system.file("extdata", sheet$file, package = "jDMRgrid")
+#'
+#' out <- file.path(tempdir(), "jDMRgrid_grid")
+#' runjDMRgrid(out.dir = out, window = 200, step = 50, samplelist = sheet,
+#'             contexts = "CG", min.C = 10, min.C.type = "percentile",
+#'             mincov = 0, include.intermediate = FALSE, runName = "example")
+#' list.files(out)
 #' @export
 #'
 runjDMRgrid <- function(
         out.dir, window, step, samplelist, contexts=c('CG','CHG','CHH'), 
         min.C, mincov=0, include.intermediate=FALSE, runName='GridGenome',
         numCores = NULL, parallelApply = FALSE, if.Bismark = FALSE,
-        FASTA.file = NULL)
+        FASTA.file = NULL,
+        min.C.type = c("percentile", "count"),
+        region.mode = c("grid", "cluster-grid", "cluster"),
+        max.gap = 150L, min.sites = 5L, gap.quantile = 0.9)
 {
+    ## min.C changed meaning between versions of this package -- it was an absolute count of
+    ## cytosines and became a percentile of the observed distribution. The two differ by
+    ## orders of magnitude, and neither reading announces itself in the output, so a script
+    ## carried over from an earlier version silently filters something quite different from
+    ## what its author intended. There is no safe default, so the interpretation must be
+    ## stated. A percentile is also actively dangerous where the grid extends well beyond the
+    ## data: if most windows hold no cytosines, a low percentile evaluates to zero and every
+    ## empty window is retained, after which the HMM has nothing to fit.
+    if (missing(min.C.type))
+        stop("min.C.type must be given explicitly.\n",
+             "  \"count\"      - min.C is an absolute number of cytosines per region\n",
+             "  \"percentile\" - min.C is a percentile of the observed distribution\n",
+             "The two differ by orders of magnitude and the meaning of min.C changed between ",
+             "versions, so no default is applied.", call. = FALSE)
+
+    ## FIX: wrote into a user-supplied directory without creating it, so a fresh run
+    ## failed with "No such file or directory".
+    dir.create(out.dir, recursive = TRUE, showWarnings = FALSE)
+
     methimputefiles <- samplelist$file
     bin.genome.files <- binGenome(
         methimputefiles = methimputefiles, contexts = contexts, 
         window = window, step = step, min.C = min.C, out.dir = out.dir,
-        runName = runName, if.Bismark = if.Bismark, FASTA.file = FASTA.file)
+        runName = runName, if.Bismark = if.Bismark, FASTA.file = FASTA.file,
+        min.C.type = match.arg(min.C.type), region.mode = match.arg(region.mode),
+        max.gap = max.gap, min.sites = min.sites, gap.quantile = gap.quantile)
     bin.select <- lapply(seq_along(contexts), function(x) {
         b <- bin.genome.files[grep(contexts[x], bin.genome.files)]
         if (length(b) != 0) {
@@ -375,15 +503,18 @@ runjDMRgrid <- function(
     bin.select <- Filter(Negate(is.null), bin.select)
     names(bin.select) <- unlist(lapply(bin.select, function(x) names(x)[1]))
     merge_list <- lapply(bin.select, function(x) dget(x))
-    out.samplelist <- expand.grid(file = samplelist$file, context = contexts)
+    ## FIX: expand.grid() still defaults to stringsAsFactors = TRUE in R 4.x (unlike
+    ## data.frame(), which changed in 4.0), so `file` came back as a factor. gsub() coerces
+    ## factors silently, which hid this; basename() does not.
+    out.samplelist <- expand.grid(file = samplelist$file, context = contexts,
+                                  stringsAsFactors = FALSE)
     out.samplelist <- merge(out.samplelist, data.frame(
         context = names(bin.select), id = seq(1,length(names(bin.select)))))
     if (if.Bismark == FALSE) {
-        out.samplelist$methfn<-unlist(lapply(out.samplelist$file,function(xi){
-                gsub(".*methylome_|\\.txt|_All.txt$","",xi)}))
+        out.samplelist$methfn <- deriveSampleName(out.samplelist$file)
         cyt.pos.all<-NULL} else {
-        out.samplelist$methfn<-unlist(lapply(out.samplelist$file,function(xi){
-                gsub("|\\.txt|.CX_report.txt$","",xi)}))
+        out.samplelist$methfn <- deriveSampleName(out.samplelist$file,
+                                                  if.Bismark = TRUE)
         cyt.pos.all<-extractCytosinesFromFASTA(
             file = FASTA.file, contexts = contexts)}
     if (parallelApply == TRUE) {

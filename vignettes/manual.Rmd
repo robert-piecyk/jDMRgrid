@@ -1,313 +1,647 @@
 ---
-title: 'jDMRgrid: a heuristic DMR caller for WGBS data using grid approach'
-author: "Robert S. Piecyk, Rashmi R. Hazarika, Yadi Shahryary, Frank Johannes"
-date: "2024-10-31"
+title: "jDMRgrid: calling differentially methylated regions from WGBS data"
+author:
+- name: Robert Stefan Piecyk
+  email: robert.s.piecyk@gmail.com
+- name: Rashmi Rekha Hazarika
+- name: Yadollah Shahryary Dizaji
+- name: Frank Johannes
+date: "`r Sys.Date()`"
+## The DMR matrices carry one column per sample and the toy sample names are long, so those
+## tabulars run past the text block. Shrinking them via header-includes rather than
+## rmarkdown::includes(in_header=) matters: BiocStyle inserts the author block by
+## post-processing a %% AUTH AFFIL %% marker, and passing `includes` breaks that path, so
+## the PDF renders with no author at all.
+header-includes:
+  - \usepackage{etoolbox}
+  - \AtBeginEnvironment{tabular}{\footnotesize\setlength{\tabcolsep}{3pt}}
+  ## BiocStyle fills the title block by post-processing, and does not set pandoc's
+  ## author-meta, so the PDF /Author field would otherwise be empty.
+  - \hypersetup{pdfauthor={Robert Stefan Piecyk, Rashmi Rekha Hazarika, Yadollah Shahryary Dizaji, Frank Johannes}}
 output:
-  pdf_document:
-    toc: true
-    toc_depth: 2
-  html_document:
-    toc: true
-    toc_depth: 2
+    BiocStyle::html_document:
+        toc: true
+        toc_float: true
+        toc_depth: 3
+        number_sections: true
+    BiocStyle::pdf_document:
+        toc: true
+        toc_depth: 3
+        number_sections: true
+vignette: |
+    %\VignetteIndexEntry{jDMRgrid}
+    %\VignetteEncoding{UTF-8}
+    %\VignetteEngine{knitr::rmarkdown}
+editor_options:
+  markdown:
+    wrap: 72
 ---
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.
-
-```{r}
-setwd("/jlab/home/ming/rmarkdown")
+```{r setup, include = FALSE}
+## 120 is comfortable in the HTML container but overflows the PDF text block; 80 fits both.
+options(width = 80)
+knitr::opts_chunk$set(
+    collapse = FALSE,
+    eval = TRUE,
+    comment = " ",
+    message = FALSE,
+    warning = FALSE,
+    ## formatR reflows the chunks and fights the hand-wrapped source, which is a large
+    ## part of why the rendered code looked ragged. The source is already wrapped to fit.
+    tidy = FALSE,
+    size = "small"
+)
 ```
 
-
-## 1 Input files
-
-For generation of region-level calls, jDMRgrid requires the following inputs.
-
-## 1.1 Methimpute files:
-
-Base-level methylome outputs (generated using the R package "Methimpute")
-
-## 1.2 A metadata file containing description about samples
-
-For population data-sets without replicates, listfiles.fn should have the structure below.
-
-```{r}
-load(system.file("data", "listFiles1.RData", package = "jDMRgrid"))
-listFiles1$file <- system.file("extdata", listFiles1$file, package = "jDMRgrid")
-listFiles1
+```{r eval=TRUE, include=FALSE}
+library(jDMRgrid)
+library(data.table)
+vig.dir <- file.path(tempdir(), "jDMRgrid_vignette")
+dir.create(vig.dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
-For pairwise control-treatment data-sets with replicates,additional columns "replicate" and "group" should be provided. See
-structure below.
+# Overview
 
-```{r}
-load(system.file("data", "listFiles2.RData", package = "jDMRgrid"))
-listFiles2$file <- system.file("extdata", listFiles2$file, package = "jDMRgrid")
+jDMRgrid identifies differentially methylated regions (DMRs) between groups of samples in
+whole-genome bisulphite sequencing (WGBS) data.
+
+The method proceeds in two stages. The genome is first partitioned into candidate **regions**,
+and a hidden Markov model is fitted to each region independently for every sample and sequence
+context, assigning a discrete **methylation state**: `0` for unmethylated, `1` for methylated and,
+where `include.intermediate=TRUE`, `0.5` for an intermediate state. The per-sample calls are then assembled into a **matrix**
+with one row per region and one column per sample. A region is reported as differentially
+methylated where the assigned state differs between groups.
+
+Two properties of this design constrain what can be detected, and should be considered when
+interpreting the output.
+
+* Detection requires a change of **state**, not a change of level. CG methylation declining
+  from 75% to 55% is biologically substantial, but both values are classified as methylated,
+  so no call is made. jDMRgrid reports regions that cross a state boundary.
+* Each state call carries a posterior probability, unused during filtering and ranking unless
+  requested. A call assigned at posterior 0.56 otherwise counts the same as one assigned at
+  0.99 (see *Requiring a minimum posterior*).
+
+jDMRgrid supports two experimental designs, and the choice determines which functions apply
+and which filter is used.
+
+| design | sample sheet | comparison | filter |
+|---|---|---|---|
+| control/treatment with replicates | `file`, `sample`, `replicate`, `group` | pairwise between groups | `replicate.consensus` |
+| population without replicates | `file`, `sample` | across all samples | `epiMAF.cutoff` |
+
+*A worked example* follows the control/treatment design from region calling to annotation;
+*Population data without replicates* covers the other. Region definition, confidence filtering,
+ranking, annotation and everything in *Scale* apply equally to both.
+
+The pipeline comprises five functions, each operating on the output of the previous stage:
+
+```
+runjDMRgrid()      region calls, per sample, per context
+makeDMRmatrix()    one matrix, all samples
+splitGroups()      one matrix per pairwise comparison   (control/treatment only)
+filterDMRmatrix()  drop regions that are not differential
+rankDMRs()         order what survives
+```
+
+`context.specific.DMRs()` and `annotateDMRs()` then classify and annotate the result.
+
+# A worked example
+
+The package includes the first 250 kb of *A. thaliana* chromosome 1 (91,971 cytosines) for four
+samples: two replicates of a wild type and two of a mutant. Sequencing depth averages 11.5
+reads per cytosine with 3% of positions uncovered. The files were generated by running
+METHimpute over this interval, so posteriors and state calls are genuine, not placeholders.
+99.9% of calls carry a posterior above 0.9.
+
+This governs the results below. The calls are well supported and the two groups agree across
+most of the interval, so **few regions survive filtering**: 1 in CG, 18 in CHG and 30 in CHH
+after overlapping windows are merged. That is the expected outcome for a well-powered
+comparison of two similar methylomes. Sparse coverage would yield many more apparent DMRs,
+most of them state calls fluctuating at random between samples.
+
+This section follows the control/treatment design from region calling through to annotation.
+Population data without replicates constitutes a different design and is treated separately in
+*Population data without replicates*.
+
+The sample sheet needs `file`, `sample`, `replicate` and `group`:
+
+```{r, include=TRUE}
+load(system.file("data", "listFiles2.RData", package="jDMRgrid"))
 listFiles2
 ```
 
-\newpage
-
-## 2 Generate cytosine region calls from genome
-
-## 2.1 Run jDMRgrid on a binned genome
-
-This function uses a grid approach to bin the genome into equal sized bins. User specifies the window and step size as numeric values.
-
-**out.dir:** PATH to output directory.
-
-**window:** NUMERIC VALUE specifying bin size.
-
-**step:** NUMERIC VALUE specifying step size. If bin and step size are equal, we are utilizing non-sliding window approach.
-
-**samplelist:** DATAFRAME OBJECT containing information about file, sample and replicate. For control/treatment data an additional column specifying the replicates is required.
-
-**contexts:** VECTOR or CHARACTER presenting sequence contexts of the cytosine. By default this option is set to
-c("CG", "CHG", "CHH", "CHH"). If you want to run for a single context such as CG, set it as "CG".
-
-**min.C:** NUMERIC VALUE specifying percentile threshold based on empirical distribution of the cytosines across bins.
-
-**mincov:** NUMERIC VALUE specifying minimum read coverage over cytosines. By default this option is set as 0.
-
-**include.intermediate:** LOGICAL specifying whether or not the intermediate component should be included in the HMM model. By default this option is set as FALSE.
-
-**runName:** CHARACTER as the name of the operation. By default this option is set to ‘GridGenome’.
-
-**parallelApply:** LOGICAL specifying if future.apply package should be used to use parallel operation. By default this
-option is set to FALSE.
-
-**numCores:** NUMERIC VALUE specifying number of cores to perform parallel operation using foreach loop. By default this option is set to NULL.
-
-**if.Bismark:** Logical if Bismark inputs (CX reports in txt format) are used. Default as FALSE. (logical)
-
-**FASTA.file:** Path to the FASTA file; required if Bismark outputs are used. Please use the same FASTA as in Bismark analysis. Default as NULL. (char)
-
-```{r echo = TRUE, message = FALSE, warning=FALSE, results='hide'}
-library(jDMRgrid)
-runjDMRgrid(out.dir = "./population",
-            window = 200, step = 50, samplelist = listFiles1,
-            contexts = c("CG", "CHG", "CHH"), min.C = 10, mincov = 0,
-            include.intermediate = TRUE,
-            runName = "Arabidopsis")
-
-runjDMRgrid(out.dir = "./replication",
-            window = 200, step = 50, samplelist = listFiles2,
-            contexts = c("CG", "CHG", "CHH"), min.C = 10, mincov = 0,
-            include.intermediate = TRUE,
-            runName = "Arabidopsis")
+```{r eval=TRUE, include=FALSE}
+## resolve the packaged file paths; the table above intentionally shows the sheet in its
+## shipped, relative form
+listFiles2$file <- system.file("extdata", listFiles2$file, package = "jDMRgrid")
 ```
 
-## 2.2 Output files of jDMR Grid approach
+## Call regions
 
-Region files containing state calls, methylation levels and posteriorMax will be generated for each sample and for each context.
+`runjDMRgrid()` tiles the genome into overlapping windows and fits the HMM in each. `window`
+and `step` set the tiling: equal values give non-overlapping bins, and a `step` below `window`
+slides them. `min.C` requires a minimum number of cytosines per window, so that states are not
+fitted on almost no data.
 
-```{r, message=FALSE}
-library(data.table)
-jDMRgrid.out <- fread("./population/methimpute_p1_CG.txt", header = T)
-head(jDMRgrid.out)
+Complete argument documentation is given in `?runjDMRgrid`; the discussion below is confined
+to the consequences of each choice.
+
+```{r eval=TRUE, include=TRUE, results = "hide"}
+runjDMRgrid(
+    out.dir = file.path(vig.dir, "replicate/grid"),
+    window = 200, step = 50, samplelist = listFiles2,
+    contexts = c("CG", "CHG", "CHH"), min.C = 10, min.C.type = "percentile",
+    mincov = 0, include.intermediate = FALSE, runName = "Arabidopsis")
 ```
 
-**seqnames, start and end:** Chromosome coordinates
+`window` and `step` are the principal parameters. A smaller window localises a DMR more
+precisely but places fewer cytosines in each region, so states are fitted on less evidence and
+posteriors decline; a larger window is better supported but blurs region boundaries and may
+average a short DMR against its surroundings. A 200 bp window with a 50 bp step is a reasonable
+starting point for *A. thaliana*; species with sparser methylation generally require larger
+windows.
 
-**context:** Sequence context of cytosine i.e CG,CHG,CHH
+`min.C.type` has no default and must be stated. Under `"percentile"`, `min.C=10` discards the
+least cytosine-dense tenth of windows; under `"count"` the same value requires ten cytosines
+per window. The two interpretations differ by orders of magnitude, and the meaning of `min.C`
+changed between versions of the package, so no default is applied.
 
-**posteriorMax:** Posterior value of the methylation state call
+The distinction also matters where the grid extends beyond the data. Chromosome lengths are
+inferred from the input, so a run restricted to part of a chromosome still tiles from the first
+position; if most windows contain no cytosines, a low percentile evaluates to zero, every empty
+window is retained and the HMM has nothing to fit.
 
-**status:** Methylation status
+One file is written per sample per context:
 
-**rc.meth.lvl:** Recalibrated methylation level calculated from the posteriors and fitted parameters
-
-\newpage
-
-## 3 Generate DMR matrix
-
-## 3.1 Run "makeDMRmatrix"
-
-This function generates a DMR matrix of state calls, rc.meth.lvls and posterior probabilities for all samples in one dataframe.
-
-**samplelist:** DATAFRAME OBJECT containing information about file, sample and replicate. For control/treatment data an additional column specifying the replicates is required.
-
-**input.dir:** PATH to directory containing region files.
-
-**out.dir:** PATH to output directory.
-
-**contexts:** sequence contexts of the cytosine. By default this option is set to c("CG", "CHG", "CHH", "CHH"). If you want to run for a single context such as CG, set it as "CG".
-
-**postMax.out:** By default this option is set as FALSE. You can set it to TRUE if you want to output the DMR matrix containing posterior probabilities for the status call of each region.
-
-**include.intermediate:** LOGICAL specifying whether or not the intermediate component should be included in the HMM model. By default this option is set as FALSE.
-
-```{r, message=FALSE}
-makeDMRmatrix(contexts = c("CG", "CHG", "CHH"), postMax.out = TRUE,
-              samplelist = listFiles1,
-              input.dir = "./population",
-              out.dir = "./population/matrix",
-              include.intermediate = TRUE)
-
-makeDMRmatrix(contexts = c("CG", "CHG", "CHH"), postMax.out = TRUE,
-              samplelist = listFiles2,
-              input.dir = "./replication",
-              out.dir = "./replication/matrix",
-              include.intermediate = TRUE)
+```{r eval=TRUE, include=TRUE}
+region.calls <- fread(file.path(vig.dir, "replicate/grid/methimpute_p1_CG.txt"))
 ```
 
-## 3.2 Output files of makeDMRmatrix function
-
-"CG_StateCalls.txt" has the following structure. "0" in the output matrix denotes "Unmethylated", "1" stands for "Methylated" and "0.5" stands for "Intermediate".
-
-```{r}
-statecalls <- fread("./population/matrix/CG_StateCalls.txt", header = T)
-head(statecalls)
+```{r echo=FALSE}
+knitr::kable(head(region.calls), digits = 4,
+             caption = "Region calls for one sample, CG context.")
 ```
 
-"CG_rcMethlvl.txt" has the following structure. The output matrix contains recalibrated methylation levels for each sample and for the specific region.
+`status` gives the state call and `rc.meth.lvl` a recalibrated methylation level derived from
+the posteriors and the fitted model parameters. Note that `rc.meth.lvl` is **not** the observed
+methylation of the region: it is a posterior-weighted mixture of the fitted state levels and
+therefore clusters around a small number of values. It is suitable for comparing regions within
+a single run, but should not be interpreted as a measurement of methylation.
 
-```{r}
-rcmethlvls <- fread("./population/matrix/CG_rcMethlvl.txt", header = T)
-head(rcmethlvls)
+## Build the matrix
+
+```{r eval=TRUE, include=TRUE, results = "hide"}
+makeDMRmatrix(
+    contexts = c("CG", "CHG", "CHH"), postMax.out = TRUE,
+    samplelist = listFiles2,
+    input.dir = file.path(vig.dir, "replicate/grid"),
+    out.dir = file.path(vig.dir, "replicate/matrix"), include.intermediate = FALSE)
 ```
 
-"CG_postMax.txt" has the following structure. The output matrix contains posterior probabilities for each sample and for the specific region.
+`include.intermediate` must match between `runjDMRgrid()` and `makeDMRmatrix()`. Calling
+regions with a three-state model and building the matrix with a two-state one leaves posteriors
+from a model the matrix does not describe. A uniform three-state posterior is 0.333, which
+reads like a low-confidence two-state call and is not one. Nothing warns about the mismatch.
 
-```{r}
-postMax <- fread("./population/matrix/CG_postMax.txt", header = T)
-head(postMax)
+`postMax.out=TRUE` is the default. It increases output volume by approximately 35-40%, but both
+`filterDMRmatrix(min.posterior=)` and `rankDMRs()` require the matrix it writes, so it is
+enabled by default so those options have input. Disable it only where storage is constrained
+and the posteriors are certainly not required.
+
+```{r eval=TRUE, include=TRUE}
+statecalls <- fread(file.path(vig.dir, "replicate/matrix/CG_StateCalls.txt"), header=TRUE)
 ```
 
-## 3.3 Split DMR matrix into pairwise groups
-
-Ignore this step if you are running jDMR on population data without replicates. For pairwise control-treatment data-sets with replicates, you need to run this step. This function generates a DMR matrix of state calls, rc.meth.lvls and posterior probabilities for each pairwise control-treatment in one dataframe. For example, if the samplelist includes control, treatment1 and treatment2, this function generates a DMR matrix of state calls, rc.meth.lvls and posterior probabilities for control-treatment1 in one dataframe, and a DMR matrix of state calls, rc.meth.lvls and posterior probabilities for control-treatment2 in one dataframe.
-
-**samplelist:** DATAFRAME OBJECT containing information about file, sample and replicate. For control/treatment data an additional column specifying the replicates is required.
-
-**input.dir:** PATH to directory containing region files.
-
-**out.dir:** PATH to output directory.
-
-**contexts:** sequence contexts of the cytosine. By default this option is set to c("CG", "CHG", "CHH"). If you want to run for a single context such as CG, set it as "CG".
-
-**postMax.out:** by default this option is set to FALSE. If you want to output the matrix containing posterior probabilities set it to TRUE.
-
-```{r, message=FALSE}
-splitGroups(samplelist = listFiles2, postMax.out = TRUE, contexts = c("CG", "CHG", "CHH"),
-            input.dir = "./replication/matrix",
-            out.dir = "./replication/matrix")
+```{r echo=FALSE}
+knitr::kable(head(statecalls), caption = "State calls: 0 unmethylated, 1 methylated.")
 ```
 
-## 3.4 Output files of splitGroups function
+Every region appears in three matrices with identical rows in identical order: the state calls
+above, the methylation levels, and the posteriors.
 
-```{r}
-statecalls_split <- fread("./replication/matrix/CG_WT_mutant1_StateCalls.txt", header = T)
-head(statecalls_split)
+```{r eval=TRUE, include=TRUE}
+postMax <- fread(file.path(vig.dir, "replicate/matrix/CG_postMax.txt"), header=TRUE)
 ```
 
-\newpage
-
-## 4 Filter DMR matrix
-
-## 4.1 Filter the DMR matrix
-
-This function filters the DMR matrix for non-polymorphic patterns.
-
-For population data-sets without replicates, this function will find the outputs of 'runjDMRgrid' for filtering. For pairwise control-treatment data-sets with replicates, this function will find the outputs of 'splitGroups' for filtering.
-
-**data.dir:** PATH to folder containing DMR matrix
-
-**epiMAF.cutoff:** Applicable for calling calling population DMRs. This option can be used to filter for Minor Epi-Allele frequency as specified by user. By default, this option is set to NULL.
-
-**replicate.consensus:** Applicable for control-treatment data-sets with replicates. Users can specify the percentage of concordance in methylation states in samples with multiple replicates. For datasets with just 2 replicates, replicate.consensus should be set as 1 (means 100% concordance). By default, this option is set to NULL.
-
-**samplelist:** DATAFRAME OBJECT containing information about file, sample and replicate. For control/treatment data an additional column specifying the replicates is required.
-
-**if.mergingBins:** Logical argument if merging consecutive bins having the same stateCalls should be performed. By default set to TRUE. (logical)
-
-```{r echo = TRUE, message = FALSE, warning=FALSE, results='hide'}
-filterDMRmatrix(epiMAF.cutoff = NULL, replicate.consensus = 0.5,
-                data.dir = "./population/matrix",
-                samplelist = listFiles1, if.mergingBins = FALSE)
+```{r echo=FALSE}
+knitr::kable(head(postMax), digits = 4,
+             caption = "Posterior probability behind each state call.")
 ```
 
-```{r echo = TRUE, message = FALSE, warning=FALSE, results='hide'}
-filterDMRmatrix(epiMAF.cutoff = NULL, replicate.consensus = 0.5,
-                data.dir = "./replication/matrix",
-                samplelist = listFiles2, if.mergingBins = FALSE)
+## Split into comparisons
+
+With a `group` column, the comparison is pairwise and the matrix has to be split before it can
+be filtered.
+
+```{r eval=TRUE, include=TRUE, results = "hide"}
+splitGroups(
+    samplelist = listFiles2,
+    input.dir = file.path(vig.dir, "replicate/matrix"),
+    out.dir = file.path(vig.dir, "replicate/matrix"))
 ```
 
-## 4.2 Filtered Output
+This step is not optional. Once a sample sheet carries a `group` column, `filterDMRmatrix()`
+searches for the per-comparison files written here and fails if they are absent; see
+*Troubleshooting*.
 
-"CG_StateCalls-filtered.txt" has the following structure.
+## Filter
 
-```{r}
-statecalls_filtered <- fread("./population/matrix/CG_StateCalls-filtered.txt", header = T)
-head(statecalls_filtered)
+`filterDMRmatrix()` applies up to four independent filters. Only the first is unconditional;
+the remainder are enabled by supplying the corresponding argument.
 
-statecalls_filtered <- fread("./replication/matrix/CG_WT_mutant1_StateCalls-filtered.txt", header = T)
-head(statecalls_filtered)
+| argument | effect |
+|---|---|
+| *always on* | Drops non-polymorphic regions, where every sample is in the same state and nothing can be differential. |
+| `epiMAF.cutoff` | Population data. Drops regions where the rarer state is carried by fewer than this fraction of samples. |
+| `replicate.consensus` | Control/treatment with replicates. Keeps a region only if each group's replicates agree and the groups differ from one another. |
+| `min.posterior` | Any design. Drops regions where any sample's state was called below this posterior. |
+
+`epiMAF.cutoff` and `replicate.consensus` address different questions and are not normally
+combined: the former is appropriate for a population without replicates, the latter for a
+control/treatment design. Both default to `NULL`, so a call supplying neither removes only
+non-polymorphic regions.
+
+The value of `replicate.consensus` specifies the concordance required among the replicates of a
+group. With two replicates the only meaningful value is `1`.
+
+One threshold is **not** exposed. A region must additionally exhibit a between-group difference
+of at least `diff.ct` in the proportion of replicates called methylated, and this is fixed
+internally at **0.5**. With three replicates per group this requires at least a 2-of-3 versus
+0-of-3 split, and cannot be relaxed from the top-level call.
+
+`if.mergingBins` merges consecutive bins carrying identical calls across all samples, turning
+a run of overlapping windows into a single region. **It defaults to `TRUE`**, and there are few
+circumstances in which it should be disabled.
+
+With `window=200` and `step=50` the grid advances in 50 bp increments, so a single differential
+region is spanned by several overlapping windows, each reported as a separate row. In the
+packaged data, 56 unfiltered CHH rows correspond to only 30 distinct intervals, and one region
+(103,106-104,298) accounts for 16 of them. Without merging, this propagates through the
+remainder of the analysis: a ranked list is dominated by near-duplicates of a single region, and
+any count of DMRs reflects the geometry of the window grid, not the biology.
+
+```{r eval=TRUE, include=TRUE, results = "hide"}
+filterDMRmatrix(
+    epiMAF.cutoff = NULL, replicate.consensus = 0.8,
+    data.dir = file.path(vig.dir, "replicate/matrix"),
+    samplelist = listFiles2, if.mergingBins = TRUE)
 ```
 
-\newpage
+Because the sheet has groups, the filtered output carries the comparison in its name:
 
-## 5 Search for context-specific and annotate DMRs
-
-## 5.1 Output context specific DMR
-
-Output DMRs specific for contexts i.e CG-only, CHG-only, CHH-only, non-CG and multi-context DMRs using the StateCalls_filtered.txt files (if variable if Filtered equals to TRUE) or StateCalls.txt files (if variable ifFiltered equals to FALSE, as default).
-
-```{r, message=FALSE}
-context.specific.DMRs(samplelist = listFiles2,
-                      output.dir="./replication/context_DMRs",
-                      input.dir = "./replication/matrix",
-                      if.filtered = TRUE)
+```{r eval=TRUE, include=TRUE}
+## CHH carries most of the difference between these two groups; CG barely differs at all
+filtered <- fread(file.path(vig.dir,
+    "replicate/matrix/CHH_WT_mutant1_StateCalls-filtered.txt"), header=TRUE)
 ```
 
-## 5.2 Annotate DMRs
-
-This function annotates the lists of DMRs. Any file(.txt) containing 3 columns (chr, start, end) can be annotated using the annotateDMRs function. Please move all files to be annotated to a separate folder and set the full PATH to the "input.dir" option.
-
-**gff.files:** Multiple gff3 annotation files can be supplied as a vector
-
-**annotation:** specify annotation categories
-
-**input.dir:** path to folder containing only files to be annotated. Any file containing 3 columns (chr, start, end) can be annotated using the annotateDMRs function.
-
-**if.gff3:** whether to output annotated files in gff3 format
-
-**out.dir:** path to output folder
-
-In the following example, I will annotate the files generated in section 3.1
-
-```{r, message=FALSE}
-gff.file_promoters <- system.file("extdata/toyData", "TAIR10_promoters.gff3", package = "jDMRgrid")
-gff.file_TE <- system.file("extdata/toyData", "TAIR10_TE.gff3", package = "jDMRgrid")
-
-annotateDMRs(gff.files = c(gff.file_promoters, gff.file_TE),
-             annotation = c("promoters", "TE"),
-             input.dir = "./replication/annotation",
-             if.gff3 = FALSE,
-             out.dir = "./replication/annotation")
+```{r echo=FALSE}
+knitr::kable(head(filtered), caption = "Regions surviving the filters.")
 ```
 
-## 5.3 Output files after annotation
+## Requiring a minimum posterior
 
-Mapped files are output in .txt and/or .gff3 format. Addiitonally, a DMR count table is generated.
+Nothing so far has used the posteriors. `min.posterior` keeps only regions where every sample
+in the comparison was called with at least that confidence.
 
-```{r, message=FALSE}
-annotations <- fread("./replication/annotation/CG_WT_mutant1_StateCalls_annotation.txt",
-                     header = T)
-head(annotations)
-
-DMRcounts <- fread("./replication/annotation/DMR-counts.txt", header = T)
-head(DMRcounts)
+```{r eval=TRUE, include=TRUE, results = "hide"}
+conf.dir <- file.path(vig.dir, "confidence")
+dir.create(conf.dir, showWarnings = FALSE)
+invisible(file.copy(
+    list.files(file.path(vig.dir, "replicate/matrix"), full.names = TRUE),
+    conf.dir, overwrite = TRUE))
+filterDMRmatrix(
+    replicate.consensus = 0.8, data.dir = conf.dir,
+    samplelist = listFiles2, min.posterior = 0.9, if.mergingBins = TRUE)
 ```
 
-\newpage
+0.9 is the usual threshold and is what this example uses. It removes little here because the
+packaged data is well covered, but on a dataset with thinner coverage it removed about half the
+regions that survived the other filters.
 
-## 6 R session info
+## Rank what survives
+
+Filtering returns an unordered set in which every surviving region is equally a DMR.
+`rankDMRs()` imposes an ordering by one of three methods.
+
+* `effect`: absolute difference in methylation between groups, weighted by the posterior.
+* `betabinom`: a Wald statistic with a beta-binomial variance and a context-specific
+  overdispersion `rho`. The usual default.
+* `permutation`: an empirical null from permuted group labels, with BH-adjusted FDR. This one
+  needs replicates. With three against three only 20 distinct label assignments exist, and
+  `rankDMRs()` warns when the null is too small for the FDR to mean anything.
+
+Effect sizes are recomputed from the input files as observed methylation, defined as
+sum(methylated)/sum(total) per region. Specifying `level.from="states"` uses `rc.meth.lvl`
+instead, which, as noted above, is a mixture of fitted state levels and cannot represent a
+change confined to a single state.
+
+```{r eval=TRUE, include=TRUE, results = "hide"}
+ranked.dir <- file.path(vig.dir, "ranked")
+rankDMRs(
+    data.dir = file.path(vig.dir, "replicate/matrix"), samplefiles = listFiles2,
+    contexts = "CHH", method = "betabinom", out.dir = ranked.dir, if.filtered = TRUE)
+```
+
+```{r eval=TRUE, include=TRUE}
+## the ranked table is wide; these are the columns worth reading first
+knitr::kable(
+    head(fread(file.path(ranked.dir, "CHH_rankedDMRs.txt"))[
+        , .(seqnames, start, end, delta, min_posterior, se, stat, rank)], 4),
+    digits = 4, caption = "Top-ranked DMRs (betabinom).")
+```
+
+## Classify and annotate
+
+`context.specific.DMRs()` separates CG-only, CHG-only, CHH-only, non-CG and multi-context
+DMRs. `if.filtered` selects whether it reads the filtered matrices or the unfiltered ones.
+
+```{r eval=TRUE, include=TRUE, results = "hide"}
+context.specific.DMRs(
+    samplelist = listFiles2,
+    output.dir = file.path(vig.dir, "replicate/context_DMRs"),
+    input.dir = file.path(vig.dir, "replicate/matrix"), if.filtered = FALSE)
+```
+
+`annotateDMRs()` maps any three-column file (chromosome, start, end) against one or more GFF3
+annotations. Put the files to annotate in their own directory and point `input.dir` at it.
+
+```{r eval=TRUE, include=TRUE, results = "hide"}
+gff.file_promoters <- system.file(
+    "extdata/toyData","TAIR10_promoters.gff3", package="jDMRgrid")
+gff.file_TE <- system.file(
+    "extdata/toyData","TAIR10_TE.gff3", package="jDMRgrid")
+
+annotateDMRs(
+    gff.files = c(gff.file_promoters, gff.file_TE),
+    annotation = c("promoters", "TE"),
+    input.dir = file.path(vig.dir, "replicate/context_DMRs"), if.gff3 = FALSE,
+    out.dir = file.path(vig.dir, "replicate/annotate_DMRs"))
+```
+
+```{r eval=TRUE, include=TRUE}
+DMRcounts <- fread(
+    file.path(vig.dir, "replicate/annotate_DMRs/DMR-counts.txt"), header=TRUE)
+```
+
+```{r echo=FALSE}
+knitr::kable(head(DMRcounts), caption = "DMR counts per annotation category.")
+```
+
+# Input files
+
+jDMRgrid accepts base-level methylation in either of two forms, and everything downstream of
+the region calls is identical for both.
+
+**METHimpute output** is the default. These files carry every cytosine in the genome,
+including uncovered positions, together with its context.
+
+**Bismark cytosine (CX) reports** are read when `if.Bismark=TRUE`, and then a reference FASTA
+is required as well. A CX report lists only the covered cytosines, so jDMRgrid reconstructs
+the full cytosine set from the genome and inflates the report onto it. See
+*Working from Bismark CX reports*.
+
+The sample sheet is a data frame. `file` and `sample` are always required; `replicate` and
+`group` are required for a control/treatment design and omitted for population data.
+
+# Files the pipeline writes
+
+Each stage reads the directory the previous stage wrote, so the arguments chain:
+`runjDMRgrid(out.dir=)` becomes `makeDMRmatrix(input.dir=)`, whose `out.dir` becomes
+`filterDMRmatrix(data.dir=)` and `rankDMRs(data.dir=)`. The filenames matter, because several
+functions locate their inputs by name.
+
+**`runjDMRgrid()`** writes, into `out.dir`:
+
+* `<sample>_<context>.txt`, the region calls, one file per sample per context
+* the region definition itself, as
+  `<runName>_Win<window>_Step<step>_<context>.Rdata`
+* `<runName>_optimal_minC_threshold.csv`
+
+**`makeDMRmatrix()`** writes, into `out.dir`:
+
+* `<context>_StateCalls.txt` and `<context>_rcMethlvl.txt`
+* `<context>_postMax.txt`, only when `postMax.out=TRUE`
+
+**`splitGroups()`** applies to the control/treatment design only. It rewrites those matrices
+per pairwise comparison, with the matching `rcMethlvl` file alongside each:
+
+```
+<context>_<group1>_<group2>_StateCalls.txt
+```
+
+Population data has no groups to split, so its matrices keep the plain `<context>_` names
+throughout.
+
+**`filterDMRmatrix()`** writes the same names with a `-filtered` suffix, for example
+`<context>_StateCalls-filtered.txt`.
+
+**`rankDMRs()`** writes `<context>_rankedDMRs.txt`.
+
+**`context.specific.DMRs()`** writes one file per category: CG-only, CHG-only, CHH-only,
+non-CG and multi-context.
+
+**`annotateDMRs()`** writes `<comparison>_annotation.txt` per comparison, plus a single
+`DMR-counts.txt` summary.
+
+The state calls and the methylation levels are always written as a pair, with identical
+regions in identical order. Anything reading one should match the other by coordinate rather
+than by row position, because the filtered variants are subsets.
+
+# Choosing how regions are defined
+
+The candidate regions scored by `runjDMRgrid()` can be defined in three ways, selected with
+`region.mode`. This is independent of the experimental design and applies to population and
+control/treatment data alike. Everything downstream is unchanged.
+
+| `region.mode` | candidate regions |
+|---|---|
+| `"grid"` (default) | fixed windows tiled uniformly across the whole genome |
+| `"cluster"` | cytosines of each context are clustered, and the clusters are the regions |
+| `"cluster-grid"` | cytosines are clustered first, then windows are tiled inside clusters only |
+
+Under the two clustering modes, adjacent cytosines are merged whenever the gap between them is
+below `max.gap`, and clusters holding fewer than `min.sites` cytosines are dropped.
+`max.gap="adaptive"` picks the gap per context from the observed distribution of
+inter-cytosine distances, at the quantile given by `gap.quantile`. This matters for dense
+contexts: at a fixed gap, CHH tends to merge into chromosome-scale blocks.
+
+```{r eval=TRUE, include=TRUE, results = "hide"}
+runjDMRgrid(
+    out.dir = file.path(vig.dir, "clustered"), window = 200, step = 50,
+    samplelist = listFiles2, contexts = "CG", min.C = 5, mincov = 0,
+    include.intermediate = FALSE, runName = "clustered", min.C.type = "count",
+    region.mode = "cluster", max.gap = "adaptive", min.sites = 5)
+```
+
+On the packaged toy data the three modes give very different region counts, because the grid
+covers the whole 250 kb slice while clusters cover only its cytosine-bearing parts:
+
+```{r echo=FALSE}
+knitr::kable(
+    data.frame(region.mode = c("grid", "cluster", "cluster-grid"),
+               regions = c(3922L, 702L, 1187L)),
+    caption = "Regions called for CG on the packaged toy data.")
+```
+
+The grid remains the default. On a whole genome, `"cluster-grid"` was measured to produce 76%
+more regions than the grid and to run 74% more slowly. It should therefore be selected when
+variable-density regions are specifically required, and not as a means of reducing runtime.
+
+# Population data without replicates
+
+A population without replicates is a different design: there are no groups to compare, so
+`splitGroups()` does not apply and the filter is minor epi-allele frequency, not replicate
+consensus. The sheet needs only `file` and `sample`.
+
+```{r, include=TRUE}
+load(system.file("data", "listFiles1.RData", package="jDMRgrid"))
+listFiles1
+```
+
+```{r eval=TRUE, include=FALSE}
+listFiles1$file <- system.file("extdata", listFiles1$file, package = "jDMRgrid")
+```
+
+```{r eval=TRUE, include=TRUE, results = "hide"}
+runjDMRgrid(
+    out.dir = file.path(vig.dir, "population/grid"),
+    window = 200, step = 50, samplelist = listFiles1,
+    contexts = c("CG", "CHG", "CHH"), min.C = 10, min.C.type = "percentile",
+    mincov = 0, include.intermediate = FALSE, runName = "Arabidopsis")
+makeDMRmatrix(
+    contexts = c("CG", "CHG", "CHH"), postMax.out = TRUE,
+    samplelist = listFiles1,
+    input.dir = file.path(vig.dir, "population/grid"),
+    out.dir = file.path(vig.dir, "population/matrix"), include.intermediate = FALSE)
+filterDMRmatrix(
+    epiMAF.cutoff = 0.33, replicate.consensus = NULL,
+    data.dir = file.path(vig.dir, "population/matrix"),
+    samplelist = listFiles1, if.mergingBins = TRUE)
+```
+
+Without a `group` column the filtered files keep the plain names:
+
+```{r eval=TRUE, include=TRUE}
+pop.filtered <- fread(
+    file.path(vig.dir, "population/matrix/CG_StateCalls-filtered.txt"), header=TRUE)
+```
+
+```{r echo=FALSE}
+knitr::kable(head(pop.filtered), caption = "Population DMRs after epiMAF filtering.")
+```
+
+Ranking, context-specific classification and annotation then work exactly as in the worked
+example, reading the plain `<context>_` matrices. `rankDMRs()` needs two groups to compare, so
+it applies to the control/treatment design only; the remaining stages are common to both.
+
+# Working from Bismark CX reports
+
+A CX report is the usual seven-column Bismark format: chromosome, position, strand, count
+methylated, count unmethylated, context, and trinucleotide context.
+
+```{r eval=TRUE, include=TRUE}
+cx.dir <- system.file("extdata", "toyData", package = "jDMRgrid")
+cx.head <- read.delim(gzfile(file.path(cx.dir, "cxSample1.CX_report.txt.gz")),
+                      header = FALSE, nrows = 3)
+colnames(cx.head) <- c("chr", "pos", "strand", "meth", "unmeth", "context", "trinuc")
+knitr::kable(cx.head, caption = "First rows of a Bismark CX report.")
+```
+
+The package ships two small CX reports covering the first 50 kb of *A. thaliana* chromosome 1,
+together with the matching genome slice, so this section runs in a few seconds.
+
+```{r eval=TRUE, include=TRUE}
+cxlist <- data.frame(
+    file      = file.path(cx.dir, c("cxSample1.CX_report.txt.gz",
+                                    "cxSample2.CX_report.txt.gz")),
+    sample    = c("cxA", "cxB"),
+    replicate = c("rep1", "rep1"),
+    group     = c("control", "treatment"),
+    stringsAsFactors = FALSE)
+
+## shown with basenames; the pipeline uses the full paths above
+transform(cxlist, file = basename(file))
+```
+
+The only differences from the METHimpute route are `if.Bismark=TRUE` and `FASTA.file`.
+Everything downstream is identical.
+
+```{r eval=TRUE, include=TRUE, results = "hide"}
+cx.out <- file.path(vig.dir, "bismark")
+runjDMRgrid(
+    out.dir = file.path(cx.out, "grid"), window = 200, step = 50,
+    samplelist = cxlist, contexts = "CG", min.C = 5, mincov = 0,
+    include.intermediate = FALSE, runName = "cx",
+    if.Bismark = TRUE, FASTA.file = file.path(cx.dir, "chr1_50kb.fa"),
+    min.C.type = "count")
+makeDMRmatrix(
+    contexts = "CG", postMax.out = TRUE, samplelist = cxlist,
+    input.dir = file.path(cx.out, "grid"), out.dir = file.path(cx.out, "matrix"),
+    include.intermediate = FALSE, if.Bismark = TRUE)
+```
+
+```{r eval=TRUE, include=TRUE}
+knitr::kable(fread(file.path(cx.out, "matrix", "CG_StateCalls.txt"))[1:4],
+             caption = "DMR matrix built from Bismark CX reports.")
+```
+
+# Scale
+
+The dataset in this vignette is a 250 kb slice and runs in well under a minute. Real genomes do not, and
+the cost is concentrated in one place: **region calling accounts for roughly 78% of total
+runtime**, with the DMR matrix, filtering and annotation sharing the remainder.
+
+`numCores` parallelises region calling, but the returns fall away quickly. Measured on a full
+Arabidopsis dataset:
+
+| cores | runtime | speed-up | efficiency |
+|---:|---:|---:|---:|
+| 1 | 4465 s | 1.0x | 100% |
+| 2 | 2481 s | 1.8x | 90% |
+| 4 | 1429 s | 3.1x | 78% |
+| 8 | 928 s | 4.8x | 60% |
+| 16 | 669 s | 6.7x | 42% |
+| 32 | 650 s | 6.9x | 22% |
+
+Beyond 8 cores the computation is limited by memory bandwidth, not processor time, and 32
+cores confers little advantage over 16. Eight is a reasonable default.
+
+Two further factors govern cost. CHH contains substantially more cytosines than CG or CHG, so a
+three-context run is dominated by CHH; restricting `contexts` to those actually required is the
+single most effective economy. Additionally, `region.mode="cluster-grid"` was measured to
+generate 76% more regions than the grid and to run 74% more slowly, and is therefore not a
+means of reducing runtime.
+
+# Troubleshooting
+
+**"Files do not exist or is non-readable!" from `filterDMRmatrix()`.** The sample sheet
+contains a `group` column, so the function searches for the per-comparison matrices written by
+`splitGroups()` and does not find them. Run `splitGroups()` beforehand. Population sheets carry
+no `group` column and are unaffected. The message identifies
+no file and makes no reference to `splitGroups()`, and is therefore easily misread as a failure
+of `makeDMRmatrix()`.
+
+**A single-context run cannot be filtered.** No error is raised for `contexts="CG"` until the
+filtering stage, which operates on the contexts present in the matrix directory. Running a
+single context is the most efficient way to test a configuration, but the full set should be
+generated before filtering.
+
+**`min.posterior` or `rankDMRs()` reports no input.** Both require the posterior matrix. If
+`makeDMRmatrix()` was called with `postMax.out=FALSE`, it must be re-run with the default
+`TRUE`.
+
+**"no regions survived for context ...".** `min.C` is too stringent for the data. Note that
+`min.C.type` determines whether the value is read as a percentile or an absolute count; the
+same number carries very different meanings under the two settings.
+
+**A clustering mode collapses into a small number of very large regions.** At a fixed
+`max.gap`, dense contexts merge into chromosome-scale blocks. Specifying `max.gap="adaptive"`
+derives the gap from the data separately for each context.
+
+# Session info
 
 ```{r}
 sessionInfo()
 ```
-

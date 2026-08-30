@@ -1,2 +1,6 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^vignettes/manual\.html$
+^vignettes/manual\.knit\.md$
+^vignettes/manual_files$
+^RELEASE_NOTES\.md$
