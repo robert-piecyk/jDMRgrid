@@ -266,9 +266,14 @@ rankDMRs <- function(data.dir, samplefiles, contexts = c("CG", "CHG", "CHH"),
             nullv <- unlist(null, use.names = FALSE)
             nullv <- nullv[is.finite(nullv)]
             s <- ifelse(is.finite(out$stat %||% out$score), out$stat %||% out$score, 0)
-            ## empirical p against the POOLED genome-wide null
-            out$p_emp <- (1 + vapply(s, function(z) sum(nullv >= z), numeric(1))) /
-                         (1 + length(nullv))
+            ## Empirical p against the POOLED genome-wide null, by binary search.
+            ## Scanning the null once per region is O(regions x nperm x regions): for a
+            ## million regions at 50 permutations that is 5e13 comparisons and runs for
+            ## many hours. Sorting once and counting with findInterval() is O(n log n),
+            ## and gives identical counts including at ties.
+            nullv <- sort(nullv)
+            n_ge <- length(nullv) - findInterval(s, nullv, left.open = TRUE)
+            out$p_emp <- (1 + n_ge) / (1 + length(nullv))
             out$fdr <- stats::p.adjust(out$p_emp, method = "BH")
             out$n_perm <- nb; out$seed <- seed
         }
