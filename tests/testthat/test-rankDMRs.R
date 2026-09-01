@@ -135,3 +135,30 @@ test_that("permutation leaves the caller's random stream unchanged", {
                  if.filtered = TRUE, level.from = "states", nperm = 50L, seed = 7L))))
     expect_equal(runif(3), before)
 })
+
+test_that("an empty FDR is explained by the pooled null's tail", {
+    ## The nb < 20 warning covers an unattainable p-value floor. The usual failure at scale
+    ## is different: the pooled null's tail is filled by other regions' permuted statistics,
+    ## so no region clears BH however many permutations are added. Say which one it is.
+    f <- fixture()
+    msgs <- character(0)
+    withCallingHandlers(
+        suppressWarnings(rankDMRs(data.dir = f$dir, samplefiles = f$sheet, contexts = "CG",
+                                  method = "permutation", out.dir = file.path(f$dir, "d1"),
+                                  if.filtered = TRUE, level.from = "states",
+                                  nperm = 200L, seed = 1L)),
+        message = function(m) { msgs <<- c(msgs, conditionMessage(m)); invokeRestart("muffleMessage") })
+    hit <- grep("no region reaches FDR", msgs, value = TRUE)
+    if (length(hit)) {
+        expect_match(hit[1], "pooled-null values")
+        expect_match(hit[1], "tail fraction")
+        expect_match(hit[1], "betabinom")
+    } else {
+        # a region cleared BH on this fixture, so the message correctly stayed silent
+        r <- suppressMessages(suppressWarnings(
+            rankDMRs(data.dir = f$dir, samplefiles = f$sheet, contexts = "CG",
+                     method = "permutation", out.dir = file.path(f$dir, "d2"),
+                     if.filtered = TRUE, level.from = "states", nperm = 200L, seed = 1L)))
+        expect_true(any(r$CG$fdr < 0.05, na.rm = TRUE))
+    }
+})

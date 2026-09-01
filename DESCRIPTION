@@ -13,7 +13,7 @@ Description: jDMRgrid is a component of the jDMR toolkit, an essential tool for 
     It determines methylation state calls for each individual sliding window based on a Hidden Markov Model (HMM) approach. 
     Subsequently, these calls are consolidated into a matrix format by merging data from all samples. 
     Additionally, user can perform a filtration of DMR matrix to remove non-polymorphic patterns from the merged matrix.
-License: GPL-3
+License: GPL-3 + file LICENSE
 Encoding: UTF-8
 LazyData: false
 LazyLoad: yes
