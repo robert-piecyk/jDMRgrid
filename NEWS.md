@@ -1,3 +1,38 @@
+# jDMRgrid 0.3.1
+
+## Bug fixes
+
+* `rankDMRs(method = "permutation")` computed the pooled-null p-value by scanning the
+  whole null once per region, which is quadratic in the region count. On a real epiRIL
+  matrix of 1,012,452 CG regions the call ran 22 hours at 200 permutations without
+  finishing, and 12 hours at 50. Sorting the null once and counting with `findInterval()`
+  is O(n log n); the same matrix now takes 7.6 minutes at 200 permutations and 4.4 at 50.
+  The counts are identical, ties included, so p-values and FDR are unchanged.
+
+* The permutation branch had no test coverage; the suite exercised only `betabinom`.
+  Adds the counting identity against a direct scan, an end-to-end check that a larger
+  statistic never earns a larger p against the same pooled null, and the RNG-restoration
+  guarantee that only this branch calls.
+
+## Diagnostics
+
+* When no region reaches FDR < 0.05, `rankDMRs()` now reports why. The existing warning
+  fires only when fewer than 20 label assignments exist, which is the condition for the
+  p-value floor to be attainable; that is rarely the binding constraint. With many regions
+  the pooled null's tail is filled by other regions' permuted statistics, so at 1e6 regions
+  even a one-in-a-million tail holds a few hundred values and no region clears BH however
+  many permutations are added. The message gives the strongest statistic, how many null
+  values exceed it, the tail fraction, and the BH threshold the region count implies.
+
+  Measured on that matrix: tail fraction 1.28e-06 at 50 permutations and 1.08e-06 at 200,
+  with 0 of 1,012,452 regions at FDR < 0.05 in both. Rank genome-wide with
+  `method = "betabinom"`.
+
+## Packaging
+
+* `DESCRIPTION` declares the `LICENSE` file, which `R CMD check` flagged as an undeclared
+  top-level file.
+
 # jDMRgrid 0.3.0
 
 Changes in version 0.3.0
